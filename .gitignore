@@ -1,0 +1,26 @@
+# --- ROS / catkin build artifacts ---
+build/
+devel/
+install/
+logs/
+.catkin_tools/
+*.catkin_workspace
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+
+# --- Large / generated data (track sources, not outputs) ---
+# NOTE: map deliverables (*.pgm/*.yaml/*.stl/*.world) are tracked on purpose.
+*.bag
+*.db
+*.pyc
+
+# --- Editor / OS ---
+.vscode/
+.idea/
+*.swp
+*~
+.DS_Store
