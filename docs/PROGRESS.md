@@ -1,5 +1,49 @@
 # Progress
 
+## 2026-06-03 (Jetson perception test PASSED — full RGB-D + rtabmap over USB2)
+
+Resumed the on-Jetson (Orin Nano) real-robot perception test after the earlier
+USB-cable blocker. The D435 is still on a USB 2.0 link (no USB3 cable
+available), but we found a working low-bandwidth recipe and verified the entire
+perception stack end to end against the Pi roscore (`192.168.0.200`).
+
+### Results (all green)
+- **Color stream:** 640x480 rgb8 @ **15.1 Hz**, 0 drops, 0 libusb warnings.
+- **RGB-D (color + depth + aligned_depth):** both @ **15 Hz**, 0 libusb
+  warnings — USB2 carries RGB-D fine at 640x480/15fps.
+- **signboard + apriltag pipeline** (`llm_agent signboard_recognition_real`):
+  `/tag_detections_image` processed at **15.1 Hz**, keeping up with the camera.
+  No tag detections (none in view — needs a physical AprilTag).
+- **rtabmap RGB-D SLAM** (`slam rtabmap_realsense.launch`, headless): VO
+  `/rtabmap/odom` @ **14.3 Hz**, quality ~350-380 inliers, 0 lost frames,
+  std dev ~0.0004 m, update 0.05 s / delay 0.12 s — real-time on the Jetson.
+
+### Non-obvious findings (the reason this works)
+- **USB2 CAN run RGB-D SLAM** — but only if you cut the stream set:
+  `enable_depth:=true align_depth:=true enable_color:=true`,
+  `color/depth 640x480 @ 15fps`, **IR + IMU off**. Bandwidth math: color
+  ~13.8 MB/s + depth ~9.2 MB/s ≈ 23 MB/s < USB2's ~35 MB/s usable.
+  `align_depth` is host-side CPU, costs **no** USB bandwidth. The default
+  `rs_camera.launch` (848x480, all streams incl. IR) saturates USB2 → floods
+  `libusb: Resource temporarily unavailable` and stalls.
+- **Shut the camera down with SIGINT (Ctrl-C), never SIGKILL / `rosnode kill`.**
+  Killing the realsense nodelet mid-stream wedges the D435 at the USB level
+  (lsusb still shows it, but `rs-enumerate-devices` reports "No device
+  detected"). A `USBDEVFS_RESET` ioctl (no sudo, device node is `crw-rw-rw-`)
+  did **not** recover it — only a physical replug did. SIGINT to the actual
+  roslaunch/nodelet PIDs releases the device cleanly.
+- `rostopic hz` never prints an average against this cross-machine master;
+  measure rates with a short rospy subscriber instead.
+
+### Open
+- Tag detection + map building are the only unverified steps, both physical:
+  point the D435 at an AprilTag (id → store label via `/signboards/detections`)
+  and move the camera slowly to accumulate `/rtabmap/cloud_map` + loop closures.
+- RViz/rtabmap_viz not run (headless shell, no DISPLAY) — open a viewer on a
+  machine with a display to watch the map live.
+- USB3 cable still wanted for full 848x480 / higher-rate operation; 640x480 @
+  15fps is the validated USB2 fallback for now.
+
 ## 2026-06-03 (Workspace restructure → `slam` package + Claude-asset migration)
 
 The monolithic `llm-skill` package was split by the team into per-domain ROS
