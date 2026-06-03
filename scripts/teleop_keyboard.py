@@ -81,7 +81,7 @@ HELP = """
 ========== ArmPi keyboard teleop ==========
   w/s : forward / back        a/d : strafe left / right
   j/l : rotate left / right
-  SPACE or x : STOP
+  SPACE or x : STOP           r : re-arm (if some wheels stop)
   z / c : slower / faster (linear)
   q or Ctrl-C : quit (auto-stops)
   (hold a key to keep moving; release = auto-stop ~0.4s)
@@ -134,11 +134,16 @@ def main():
             now = rospy.get_time()
 
             quit_loop = False
+            rearm = False
             move_key = None     # act on only the most recent movement intent
             for k in keys:
                 if k in ("q", "\x03"):       # q or Ctrl-C
                     quit_loop = True
                 elif k in (" ", "x"):        # explicit stop
+                    cur = SetVelocity()
+                    move_key = None
+                elif k == "r":               # re-arm latched/stalled wheels
+                    rearm = True
                     cur = SetVelocity()
                     move_key = None
                 elif k == "z":
@@ -152,6 +157,20 @@ def main():
 
             if quit_loop:
                 break
+
+            if rearm:
+                # Some wheels can latch off after sustained driving (per-motor
+                # over-current / stall protection on the Pi's motor board). A
+                # SINGLE zero may not clear it -- a sustained zero burst does,
+                # which is exactly what quitting + restarting did. Hold zero
+                # ~0.25 s here, then normal key control resumes -- no quit.
+                for _ in range(12):
+                    pub.publish(SetVelocity())
+                    rospy.sleep(0.02)
+                last_move = 0.0
+                sys.stdout.write("\r[re-armed] hold a key to drive          ")
+                sys.stdout.flush()
+                continue
 
             if move_key is not None:
                 kind, direction, asign = MOVE_KEYS[move_key]

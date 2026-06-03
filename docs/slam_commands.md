@@ -153,9 +153,11 @@ rostopic echo -n1 /detected_objects                # names + confidence + pose
 ```bash
 rosrun slam teleop_keyboard.py
 ```
-`w/s` fwd/back · `a/d` strafe · `j/l` rotate · `z/c` slower/faster · SPACE/x stop · `q` quit.
-Hold to move (auto-stops ~0.4 s after release). Drive **slowly**, esp. in-place rotation
-(15 fps VO breaks on fast yaw). Max linear 75; start ~15.
+`w/s` fwd/back · `a/d` strafe · `j/l` rotate · `z/c` slower/faster · SPACE/x stop ·
+`r` re-arm · `q` quit. Hold to move (auto-stops ~0.4 s after release). Drive **slowly**,
+esp. in-place rotation (15 fps VO breaks on fast yaw). Max linear 75; start ~15.
+**If some wheels stop mid-drive** (motor-board over-current/stall latch — more likely at
+high speed), press **`r`** to re-arm without quitting (sustained zero burst → resume).
 
 ---
 
