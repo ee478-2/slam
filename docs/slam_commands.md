@@ -178,6 +178,44 @@ ps -eo pid,comm | awk '$2=="rviz"{print "rviz pid="$1}'
 
 ---
 
+## 6b. RViz on YOUR OWN PC (ROS Noetic) — remote, native
+
+Best remote option: run RViz locally on your machine, subscribing over the
+network. Renders on your GPU; **no custom package needed** — our config uses only
+standard msgs (PointCloud2 / PoseArray / Image / Path / TF).
+
+Why it works: ROS1 master (Pi) only resolves names; topic data flows
+**peer-to-peer from the publisher**. rtabmap/camera/apriltag publish on the
+**Jetson (192.168.0.101)** — so your PC must reach **both** the Pi (master) and
+the Jetson (publishers).
+
+On **your PC**, every terminal:
+```bash
+source /opt/ros/noetic/setup.bash
+export ROS_MASTER_URI=http://192.168.0.200:11311
+export ROS_IP=$(hostname -I | awk '{print $1}')      # your PC's 192.168.0.x IP
+ping -c1 192.168.0.200 && ping -c1 192.168.0.101      # both must reply
+rostopic list | grep -E 'rtabmap|tag_detections'      # should list them
+```
+Clock sync (TF breaks if the PC and Jetson clocks differ by >~0.1s):
+```bash
+date ; ssh ee478_team2@192.168.0.101 date             # compare
+sudo ntpdate 192.168.0.200      # or chrony both to one source, if they drift
+```
+Get the config + launch:
+```bash
+scp ee478_team2@192.168.0.101:~/catkin_ws/src/slam/rviz/apriltag_rtabmap.rviz /tmp/
+rviz -d /tmp/apriltag_rtabmap.rviz                    # Fixed Frame = map
+```
+Notes:
+- `/rtabmap/cloud_map` is the full growing cloud — heavy over **WiFi**. If laggy,
+  uncheck the PointCloud2 display; landmarks + path + tag image stay light.
+- Optional `sudo apt install ros-noetic-rtabmap-ros` only if you want rtabmap's
+  own RViz plugins / `mapData` display — not needed for `apriltag_rtabmap.rviz`.
+- Nothing runs on the Jetson `:1` for this; it's purely your machine.
+
+---
+
 ## 7. Monitoring one-liners
 
 Map growth / loop closures / VO health while driving:
