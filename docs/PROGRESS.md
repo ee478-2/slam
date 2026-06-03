@@ -24,6 +24,9 @@ this file stays an index + current open items.** Newest first.
 ## Log index
 
 ### 2026-06 — real-robot `slam` → [`docs/progress/2026-06.md`](progress/2026-06.md)
+- **2026-06-03** RViz config for local_planner goto+avoidance — `381bf59` ·
+  `rviz/local_planner_goto.rviz`: robot pose/goal/path/obstacle-cloud/local-costmap;
+  topics read from source, fixed frame `odom`, camera follows `base_link`.
 - **2026-06-03** /odom: launch localization_manager with the stack — `95721c5` ·
   `slam loc` wired into `slam up`; `/odom` now publishes (the node just wasn't being run).
 - **2026-06-03** real-robot nav scripts + chassis-bug root cause + sim/eval cleanup —
