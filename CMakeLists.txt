@@ -15,7 +15,6 @@ find_package(catkin REQUIRED COMPONENTS
   nodelet
   pcl_conversions
   pcl_ros
-  pluginlib
   roscpp
   roslib
   rospy
@@ -36,9 +35,6 @@ link_directories(${GAZEBO_LIBRARY_DIRS})
 catkin_package(
   INCLUDE_DIRS
     AprilTagLocalization/include
-    local_costmap_generator/include
-  LIBRARIES
-    heightmap_nodelet
   CATKIN_DEPENDS
     geometry_msgs
     nav_msgs
@@ -52,7 +48,6 @@ catkin_package(
 
 include_directories(
   AprilTagLocalization/include
-  local_costmap_generator/include
   ${Boost_INCLUDE_DIRS}
   ${catkin_INCLUDE_DIRS}
   ${GAZEBO_INCLUDE_DIRS}
@@ -71,35 +66,6 @@ add_executable(apriltag_localization_node
 )
 target_link_libraries(apriltag_localization_node ${catkin_LIBRARIES} yaml-cpp)
 
-add_executable(heightmap_node
-  local_costmap_generator/src/heightmap_node.cpp
-  local_costmap_generator/src/heightmap.cpp
-)
-target_link_libraries(heightmap_node
-  ${catkin_LIBRARIES}
-  ${Boost_LIBRARIES}
-  ${PCL_LIBRARIES}
-)
-
-add_executable(heightmap_costmap_node
-  local_costmap_generator/src/heightmap_to_costmap.cpp
-)
-target_link_libraries(heightmap_costmap_node
-  ${catkin_LIBRARIES}
-  ${Boost_LIBRARIES}
-  ${PCL_LIBRARIES}
-)
-
-add_library(heightmap_nodelet
-  local_costmap_generator/src/heightmap_nodelet.cpp
-  local_costmap_generator/src/heightmap.cpp
-)
-target_link_libraries(heightmap_nodelet
-  ${catkin_LIBRARIES}
-  ${Boost_LIBRARIES}
-  ${PCL_LIBRARIES}
-)
-
 catkin_install_python(PROGRAMS
   localization_manager/scripts/localization_manager_node.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
@@ -107,9 +73,6 @@ catkin_install_python(PROGRAMS
 
 install(TARGETS
   apriltag_localization_node
-  heightmap_node
-  heightmap_costmap_node
-  heightmap_nodelet
   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
@@ -120,16 +83,10 @@ install(DIRECTORY
   AprilTagLocalization/launch
   AprilTagLocalization/rviz
   config
-  local_costmap_generator/launch
   localization_manager/config
   localization_manager/launch
   my_rtabmap/launch
   rviz
   scripts
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
-)
-
-install(FILES
-  local_costmap_generator/nodelets.xml
-  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/local_costmap_generator
 )
