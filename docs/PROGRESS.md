@@ -1,5 +1,53 @@
 # Progress
 
+## 2026-06-03 (real-robot nav scripts + chassis-bug root cause + sim/eval cleanup)
+
+Moved from "drive the base" to "send it to a point," found why teleop drops
+wheels, and cleaned the sim/HW tooling out of the workspace now that we're real-
+robot only.
+
+### Real-robot motion scripts (slam/scripts/)
+- `drive_straight.py <sec> [vel]` — open-loop forward for N seconds (`9107522`).
+- `go_to_goal.py <x> <y> [yaw]` — holonomic go-to-(x,y) on rtabmap TF
+  map->camera_link feedback (`73c722e`). **Goal is in rtabmap's map frame**
+  (origin = where rtabmap started); store NAMES need step-2 global localization.
+- `go_to_goal_avoid.py` — go_to_goal + reactive wall avoidance from the FRONT
+  depth camera (no sonar): repulsive obstacle vector + goal attraction. Switched
+  from holonomic to **yaw+forward-only (unicycle)** so the camera always faces
+  travel (no sideways blind spot) (`247aa13`/`4fe8436`). An oscillation fix
+  (normalize+bound the steer) was tried then **reverted at user request**
+  (`ba0645b`) — still being tuned (in-place yaw "wari-gari").
+- All three trap **SIGTERM -> stop burst** so `kill`/`timeout` can't leave the
+  base rolling. teleop gained an **`r` re-arm key** (`e6326a7`).
+
+### Chassis wheel-dropout root cause — found by SSH-reading the Pi
+- Symptom: after sustained/high-speed teleop, *some* wheels stop; quit+restart
+  recovers; worse at speed. Root cause is the **stock `chassis_control_node.py`
+  on the Pi** (`/home/ubuntu/armpi_pro/...`): `slow_velocity` ramps in a per-
+  command thread guarded by a global `th`, and `set_speed`'s I2C `except` resets
+  `th` -> overlapping ramp threads race on shared globals + the single I2C bus ->
+  some wheels get stale commands. Hits teleop AND autonomous; the real fix is
+  Pi-side (not applied — robot stock code, user's call). Saved to agent memory.
+- drive_straight (constant velocity) does NOT trigger it -> confirms the bug is
+  command-churn driven. Validated go_to_goal_avoid actually drives on hardware.
+- **Safety incident:** ran go_to_goal_avoid as a "dry-run" while the stack was
+  unexpectedly up -> the robot drove ~0.4 m and `timeout`'s SIGTERM skipped the
+  stop. Added the SIGTERM trap + an agent rule: never auto-run motion scripts.
+
+### Workspace cleanup (sim -> real)
+- Removed the whole Gazebo sim tree — `graph_planner`, `nexus_4wd_mecanum_
+  simulator` (description + plugins + worlds), `re540_final_map`, old A2-2
+  submission plots — and pruned their build refs from CMakeLists.txt + the re540
+  gazebo exports from package.xml. **`catkin_make` verified clean** (`24bd833`).
+- Removed HW3 TUM eval/sweep tooling (`run_eval_*.sh`, `sweep_resetcountdown.sh`,
+  `plot_*`, `analyze_phase_drift.py`) (`625fceb`).
+
+### Open
+- `go_to_goal_avoid` tuning (yaw oscillation / wall-avoid behaviour) on hardware.
+- "go to store_N": needs **step 2 = AprilTag global localization** so goals can be
+  store names in the room frame (rtabmap frame != global_map.yaml frame).
+- Optional: prune the now-unused gazebo build-deps (find_package(gazebo)) too.
+
 ## 2026-06-03 (slam shortcuts + remote RViz + down→up camera race fix)
 
 Tooling/usability pass on top of the live perception stack.
