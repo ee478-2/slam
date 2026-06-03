@@ -214,6 +214,45 @@ Notes:
   own RViz plugins / `mapData` display — not needed for `apriltag_rtabmap.rviz`.
 - Nothing runs on the Jetson `:1` for this; it's purely your machine.
 
+### When your PC is on a DIFFERENT network (e.g. a phone hotspot)
+
+The ROS master is the Pi on the **wired robot LAN** (`192.168.0.200`). If your PC
+is on a hotspot it can't reach that LAN — but the Jetson is **dual-homed**
+(`eth0` = robot LAN `192.168.0.101`, `wlan0` = hotspot e.g. `10.40.187.185`), so
+make the **Jetson a gateway** and route your PC's robot-LAN traffic through it.
+
+```bash
+# --- on the JETSON (ip_forward is usually already 1) ---
+sudo sysctl -w net.ipv4.ip_forward=1
+sudo iptables -t nat -C POSTROUTING -o eth0 -j MASQUERADE 2>/dev/null \
+  || sudo iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
+# *** the gotcha *** docker sets the FORWARD policy to DROP, which silently eats
+# forwarded packets even with MASQUERADE + ip_forward. Open hotspot<->robot-LAN:
+sudo iptables -I FORWARD 1 -i wlan0 -o eth0 -j ACCEPT
+sudo iptables -I FORWARD 1 -i eth0 -o wlan0 -m state --state RELATED,ESTABLISHED -j ACCEPT
+#   (blunt alternative: sudo iptables -P FORWARD ACCEPT)
+
+# --- on YOUR PC ---
+sudo ip route add 192.168.0.0/24 via 10.40.187.185   # Jetson's hotspot IP
+export ROS_MASTER_URI=http://192.168.0.200:11311
+export ROS_IP=$(hostname -I | awk '{print $1}')
+```
+Debug ladder from the PC (find where it stops):
+```bash
+ping 10.40.187.185     # 1 Jetson hotspot   (DHCP can reassign this — recheck on Jetson: ip -br addr)
+ip route get 192.168.0.200   # 2 must say 'via 10.40.187.185'
+ping 192.168.0.101     # 3 Jetson eth0 (route only, no NAT)
+ping 192.168.0.200     # 4 Pi (FORWARD+MASQUERADE) -- 3 OK but 4 fails == the docker FORWARD DROP
+```
+Notes: iptables/route changes are **not persistent** (gone on reboot — re-run, or
+persist with `iptables-save`/a netplan route). The Pi is never touched (MASQUERADE
+hides the PC behind the Jetson). Pi→PC XMLRPC callbacks can't route back, so
+mid-session publisher changes may not propagate — fine for viewing live topics.
+If this is too much, just **`ssh -X ee478_team2@10.40.187.185` and run `rviz` on the
+Jetson** (X forwards to your PC) — needs no routing/NAT, only PC↔Jetson hotspot
+reachability. (Run `rviz -d ...` directly, not the `slam rviz` shortcut, which
+forces the Jetson-local `:1` display.)
+
 ---
 
 ## 7. Monitoring one-liners
