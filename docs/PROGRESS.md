@@ -1,5 +1,64 @@
 # Progress
 
+## 2026-06-03 (YOLO perception + AprilTag-as-rtabmap-landmark, real robot)
+
+Same on-Jetson session, after the map-building pass. Tested the two remaining
+perception branches live, with viewers on the local `:1` desktop.
+
+### YOLO object detection — pipeline verified (`fcc25b2`)
+- Ran `manipulation_control/scripts/object_detection.py` on the live camera
+  (it's outside `slam/` scope — executed with permission). Model `best.pt`
+  classes = **`cup`, `drink`, `hamburger`, `medicine`** (the 4 grasp objects).
+  torch CUDA available → runs on the Orin GPU; `/detected_objects/debug_image`
+  published at ~6.7 Hz (inference_hz=8). No object was in view to score a
+  detection, but the RGB-D → 3D → publish path is up.
+- Ran with `_base_frame:=camera_link` so the base-frame transform uses the
+  camera TF only (no robot/`base_link` TF exists with rtabmap off). Added
+  `rviz/yolo.rviz` (Image on `/detected_objects/debug_image`).
+
+### AprilTag detection + rtabmap landmarks — VERIFIED (`2a333af`)
+- The sim `apriltag_pipeline.launch` is wired for the Gazebo camera and the
+  sim world config, and its localization node uses `tag_config_name=
+  2025/re540_simulation`. `localization_manager` is **disabled from the build**
+  (`*.legacy`). So wrote `localization_manager/launch/apriltag_realsense.launch`
+  — `apriltag_ros` continuous_detection on the real D435 (tag36h11, our bundle
+  `tags.yaml`), correct real-camera remaps, no sim localization node.
+- `rtabmap_realsense.launch` already subscribes `/tag_detections`. With both up
+  and a short drive: **tags id 7 and 11 detected → rtabmap registered them as
+  landmarks** (graph ids `-7`, `-11`; rtabmap stores a landmark as `-(tag_id)`).
+  `/rtabmap/landmarks` (PoseArray) held the 2 landmark poses and **persisted
+  them in the map frame after the tags left view**. Added
+  `rviz/apriltag_rtabmap.rviz` (tag image + cloud_map + landmarks + path).
+
+### Answered: are we localizing against `config/global_map.yaml`? — NO
+- `global_map.yaml` is our semantic/global deliverable (stores, signboards,
+  coordinate-source pointers). Nothing in the live stack reads it: rtabmap
+  localizes in its **own `.db` map frame**; apriltag_ros just detects;
+  the `apriltag_localization` node is sim-configured and its package is
+  disabled. Global-frame absolute localization (real tag world poses matching
+  `global_map.yaml`) is **not wired** — that's the open integration task.
+
+### Non-obvious findings
+- **`/rtabmap/mapPath` includes landmark nodes as path vertices**, not just
+  robot poses. Confirmed: landmark coords (z≈0.2) appear as mapPath vertices
+  among the ground-level robot poses (z≈0). So the RViz Path display draws
+  lines spiking up to each landmark — looks like "lines connecting landmarks"
+  but it's one Path with landmark detours (graph-id ordering artifact, not a
+  bug, not an observation link). Robot's real trajectory = the z≈0 portion.
+- **`pgrep -f` / `pkill -f` self-match their own command line** (the pattern
+  string is literally in the checker's argv), giving false "process UP" reads
+  and ineffective kills. Use `ps -eo pid,comm | awk '$2=="rviz"'` (comm field,
+  no args) or a bracketed pattern on `ps` output. Cost real time this session.
+- RealSense **camera nodelet is SIGINT-only** (USB wedge); YOLO/rviz/rtabmap
+  nodes are safe to SIGTERM/KILL — only the camera has the wedge hazard.
+
+### Open
+- Remote viewing: RViz over SSH options scoped (X11-fwd / RViz-on-client via
+  ROS master / VNC tunnel to `:1` / Foxglove+rosbridge) — not set up yet.
+- Loop closure via tag re-observation still not captured (drive back to a seen
+  tag). Wheel `/odom` still unwired (pure visual VO). global_map absolute
+  localization still unwired (above).
+
 ## 2026-06-03 (Claude skills for the perception stack lifecycle)
 
 Captured the repeated real-robot bring-up/teardown — and its hard-won gotchas —
