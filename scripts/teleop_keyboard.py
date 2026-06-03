@@ -91,13 +91,25 @@ HELP = """
 
 WATCHDOG = 0.4   # s without a movement key -> auto stop
 RATE_HZ = 20.0
+LIN_MAX = 75.0    # max linear speed (2.5x the old 30 "sane" ceiling)
+SPEED_STEP = 5.0  # z/c linear decrement / increment
 
 
-def get_key(timeout):
+def get_keys(timeout):
+    """Drain ALL pending keystrokes this tick and return them in order.
+
+    Reading a single byte per loop (the old behaviour) let key auto-repeat
+    pile up in stdin faster than we drained it, so the robot kept executing a
+    backlog of stale keys long after release -- the "laggy / queued" feel.
+    Draining the whole buffer every tick keeps input real-time; the caller
+    acts on only the most recent movement key.
+    """
+    keys = []
     r, _, _ = select.select([sys.stdin], [], [], timeout)
-    if r:
-        return sys.stdin.read(1)
-    return ""
+    while r:
+        keys.append(sys.stdin.read(1))
+        r, _, _ = select.select([sys.stdin], [], [], 0)
+    return keys
 
 
 def main():
@@ -118,21 +130,31 @@ def main():
     rate = rospy.Rate(RATE_HZ)
     try:
         while not rospy.is_shutdown():
-            k = get_key(1.0 / RATE_HZ)
+            keys = get_keys(1.0 / RATE_HZ)
             now = rospy.get_time()
 
-            if k in ("q", "\x03"):           # q or Ctrl-C
+            quit_loop = False
+            move_key = None     # act on only the most recent movement intent
+            for k in keys:
+                if k in ("q", "\x03"):       # q or Ctrl-C
+                    quit_loop = True
+                elif k in (" ", "x"):        # explicit stop
+                    cur = SetVelocity()
+                    move_key = None
+                elif k == "z":
+                    lin = max(0.0, lin - SPEED_STEP)
+                    sys.stdout.write("\r linear=%.1f        " % lin); sys.stdout.flush()
+                elif k == "c":
+                    lin = min(LIN_MAX, lin + SPEED_STEP)
+                    sys.stdout.write("\r linear=%.1f        " % lin); sys.stdout.flush()
+                elif k in MOVE_KEYS:
+                    move_key = k
+
+            if quit_loop:
                 break
-            elif k in (" ", "x"):            # explicit stop
-                cur = SetVelocity()
-            elif k == "z":
-                lin = max(0.0, lin - 2.0)
-                sys.stdout.write("\r linear=%.1f        " % lin); sys.stdout.flush()
-            elif k == "c":
-                lin = min(30.0, lin + 2.0)
-                sys.stdout.write("\r linear=%.1f        " % lin); sys.stdout.flush()
-            elif k in MOVE_KEYS:
-                kind, direction, asign = MOVE_KEYS[k]
+
+            if move_key is not None:
+                kind, direction, asign = MOVE_KEYS[move_key]
                 if kind == "lin":
                     cur = SetVelocity(velocity=lin, direction=direction, angular=0.0)
                 else:
