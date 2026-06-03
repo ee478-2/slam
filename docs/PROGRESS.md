@@ -1,5 +1,35 @@
 # Progress
 
+## 2026-06-03 (slam shortcuts + remote RViz + down→up camera race fix)
+
+Tooling/usability pass on top of the live perception stack.
+
+- **`scripts/slam_aliases.sh`** — one-word shortcuts (`slam up/cam/rtab/tags/yolo/
+  teleop/rviz/mon/check/down`). **`docs/slam_commands.md`** — human cheat sheet
+  (the long form of what the shortcuts run). Fixed stale client paths in
+  `docs/robot_commands.md` (`~/llm-skill`→`~/catkin_ws`, `my_rtabmap`→`slam`).
+- **Remote RViz from a PC.** Cleanest = run RViz on the PC against the Pi master;
+  our `apriltag_rtabmap.rviz` uses only standard msgs, so no custom package
+  needed. When the PC is on a **phone hotspot** (can't see the wired robot LAN),
+  route it through the **dual-homed Jetson** (eth0=robot LAN, wlan0=hotspot):
+  `ip_forward` + eth0 `MASQUERADE` on the Jetson, `ip route add 192.168.0.0/24
+  via <jetson-wlan-ip>` on the PC. **Gotcha that cost time:** docker leaves the
+  iptables **FORWARD policy at DROP**, silently eating forwarded packets even
+  with MASQUERADE — fix with `iptables -I FORWARD ... -j ACCEPT` for wlan0↔eth0.
+  Documented with a ping debug ladder in `slam_commands.md` §6b. `ssh -X` to the
+  Jetson is the no-NAT fallback.
+- **`slam down`→`slam up` raced the camera.** `down` SIGINT'd the camera but
+  returned before the USB device released; `up` relaunched immediately → the
+  realsense **nodelet died on device-busy**, leaving topics advertised but
+  **0 Hz** (only the nodelet *manager* alive, `/camera/color/image_raw`
+  Publishers: None). Device was NOT wedged (`rs-enumerate` saw it) — a clean
+  re-launch restored 14.8 Hz. Fixed the shortcuts: `down` now polls until
+  `rs_camera.launch` is gone, `cam` refuses to double-launch, `up` waits for
+  real frames before starting rtabmap. Same wait added to the cheat-sheet
+  manual shutdown.
+- Reminder surfaced: **`slam up` does not start RViz** (viewer is deliberately
+  separate) — run `slam rviz` or a PC-side RViz after bring-up.
+
 ## 2026-06-03 (YOLO perception + AprilTag-as-rtabmap-landmark, real robot)
 
 Same on-Jetson session, after the map-building pass. Tested the two remaining

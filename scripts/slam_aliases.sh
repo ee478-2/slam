@@ -22,6 +22,8 @@ slam() {
       echo "MASTER=$ROS_MASTER_URI  IP=$ROS_IP" ;;
 
     cam)   # RealSense, USB2 low-bandwidth recipe (SIGINT-only to stop!)
+      if pgrep -f 'rs_camera.launch' >/dev/null 2>&1; then
+        echo "camera already running — run 'slam down' first (else it races device-busy)"; return 1; fi
       setsid roslaunch realsense2_camera rs_camera.launch \
         enable_depth:=true align_depth:=true enable_color:=true \
         enable_infra1:=false enable_infra2:=false enable_gyro:=false enable_accel:=false \
@@ -45,9 +47,13 @@ slam() {
       DISPLAY="$SLAM_DISPLAY" setsid rviz -d "$SLAM_WS/src/slam/rviz/$cfg.rviz" \
         >/tmp/rviz.log 2>&1 & echo "rviz [$cfg] on $SLAM_DISPLAY" ;;
 
-    up)    slam env; slam cam; echo "...camera warming up (10s)"; sleep 10
+    up)    slam env; slam cam
+           echo "...waiting for camera to actually stream"
+           local i; for i in $(seq 1 20); do
+             timeout 2 rostopic echo -n1 /camera/color/image_raw >/dev/null 2>&1 && { echo "camera streaming"; break; }
+             sleep 1; done
            slam rtab; slam tags
-           echo "stack up. 'slam check' to verify, 'slam rviz' for the viewer." ;;
+           echo "stack up (camera+rtabmap+apriltag). NOTE: RViz is SEPARATE -> 'slam rviz' (on :1), or run rviz on your PC." ;;
 
     mon)   python3 - <<'PY'
 import rospy,time,math
@@ -98,7 +104,10 @@ PY
       ps -eo pid,comm | awk '$2=="rviz"{print $1}' | xargs -r kill 2>/dev/null
       sleep 5
       pkill -INT -f 'roslaunch realsense2_camera' 2>/dev/null
-      echo "SIGINT sent (camera last). verify: ps -eo pid,comm | grep -E 'nodelet|rtabmap'" ;;
+      # WAIT for the realsense nodelet to release the USB device before returning,
+      # else a quick 'slam up' races device-busy and the camera nodelet dies (0 Hz topics).
+      local i; for i in $(seq 1 12); do pgrep -f 'rs_camera.launch' >/dev/null 2>&1 || break; sleep 1; done
+      echo "stack down, camera released. (verify: ps -eo pid,comm | grep -E 'nodelet|rtabmap')" ;;
 
     help|*) cat <<EOF
 slam <cmd>:

@@ -292,7 +292,9 @@ pkill -INT -f 'roslaunch slam rtabmap_realsense'
 pkill -f 'object_detection.py'            # yolo: TERM ok
 sleep 5
 pkill -INT -f 'roslaunch realsense2_camera'   # camera: SIGINT, then wait
-sleep 6
+# WAIT for full USB release before any restart — a quick relaunch races
+# device-busy and the camera nodelet dies (topics advertised but 0 Hz):
+while pgrep -f 'rs_camera.launch' >/dev/null; do sleep 1; done
 # verify down + device healthy:
 ps -eo pid,comm | grep -E 'rtabmap|rgbd_odom|nodelet|rviz' | grep -v grep || echo "(all down)"
 lsusb | grep -i 8086 && echo "D435 ok"
