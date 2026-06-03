@@ -71,7 +71,7 @@ class SetVelocity(genpy.Message):
 
 # --- tunables ---
 MAP_FRAME = "map"
-ROBOT_FRAME = "camera_link"   # rtabmap localizes camera_link (no base_link on the real bot)
+ROBOT_FRAME = "base_link"     # rtabmap tracks base_link (base_link->camera_link static TF)
 HEADING_OFFSET_DEG = 0.0      # camera_link +x vs chassis forward; set if camera is yawed
 
 RATE_HZ = 10.0

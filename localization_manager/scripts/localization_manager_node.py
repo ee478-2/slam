@@ -42,7 +42,7 @@ class LocalizationManager:
         self.robot_model_name  = rospy.get_param("~robot_model_name", "nexus_4wd_mecanum")
         self.tag_freshness_s   = rospy.get_param("~tag_freshness_s", 1.0)
         self.publish_hz        = rospy.get_param("~publish_hz", 20.0)
-        self.base_frame_name   = rospy.get_param("~base_frame_name", "base_footprint")
+        self.base_frame_name   = rospy.get_param("~base_frame_name", "base_link")
 
         self._lock = threading.Lock()
         self._latest_sim_gt = None       # PoseStamped or None

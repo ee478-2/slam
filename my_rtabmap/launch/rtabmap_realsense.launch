@@ -36,6 +36,27 @@
   <arg name="odom_args"     default="--Odom/ResetCountdown 1"/>
   <arg name="launch_realsense" default="false"/>
 
+  <!-- Robot/camera frames + the base_link->camera_link mount, matching
+       manipulation_control/launch/object_detection_system.launch so SLAM, nav
+       and grasping all share base_link. With frame_id=base_link below, rtabmap
+       publishes map->odom->base_link and this static TF places the camera,
+       instead of treating the camera itself as the robot. -->
+  <arg name="base_frame"   default="base_link"/>
+  <arg name="camera_frame" default="camera_link"/>
+  <arg name="base_to_camera_x"     default="0.05975"/>
+  <arg name="base_to_camera_y"     default="0.0175"/>
+  <arg name="base_to_camera_z"     default="-0.049"/>
+  <arg name="base_to_camera_roll"  default="0"/>
+  <arg name="base_to_camera_pitch" default="0"/>
+  <arg name="base_to_camera_yaw"   default="0"/>
+  <!-- set false if manipulation_control / a bringup already publishes this TF -->
+  <arg name="publish_base_camera_tf" default="true"/>
+
+  <!-- base_link -> camera_link static mount (args: x y z yaw pitch roll parent child period_ms) -->
+  <node if="$(arg publish_base_camera_tf)"
+        pkg="tf" type="static_transform_publisher" name="slam_base_to_camera_tf"
+        args="$(arg base_to_camera_x) $(arg base_to_camera_y) $(arg base_to_camera_z) $(arg base_to_camera_yaw) $(arg base_to_camera_pitch) $(arg base_to_camera_roll) $(arg base_frame) $(arg camera_frame) 100"/>
+
   <!-- 1) RealSense D435 driver (depth aligned to color).
        align_depth:=true runs the alignment node: depth is resampled into
        the COLOR camera's pixel grid + intrinsics, so /color/image_raw and
@@ -64,7 +85,7 @@
     <arg name="rgb_topic"         value="/camera/color/image_raw"/>
     <arg name="depth_topic"       value="/camera/aligned_depth_to_color/image_raw"/>
     <arg name="camera_info_topic" value="/camera/color/camera_info"/>
-    <arg name="frame_id"          value="camera_link"/>
+    <arg name="frame_id"          value="$(arg base_frame)"/>
     <arg name="approx_sync"       value="true"/>
     <arg name="visual_odometry"   value="true"/>
     <arg name="rtabmap_viz"       value="$(arg rtabmap_viz)"/>
