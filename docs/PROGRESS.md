@@ -24,6 +24,9 @@ this file stays an index + current open items.** Newest first.
 ## Log index
 
 ### 2026-06 — real-robot `slam` → [`docs/progress/2026-06.md`](progress/2026-06.md)
+- **2026-06-04** remove local_costmap_generator component — `6037cf8` · deleted the
+  dormant heightmap node/nodelet (never in `slam up`); obstacle cloud + local costmap
+  come from sibling `local_planner`, so no functional change. Pruned `pluginlib` dep.
 - **2026-06-03** RViz config for local_planner goto+avoidance — `381bf59` ·
   `rviz/local_planner_goto.rviz`: robot pose/goal/path/obstacle-cloud/local-costmap;
   topics read from source, fixed frame `odom`, camera follows `base_link`.
