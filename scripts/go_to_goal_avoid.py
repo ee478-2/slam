@@ -75,10 +75,10 @@ HEADING_OFFSET_DEG = 0.0       # camera_link +x vs chassis forward (same as go_t
 # --- depth obstacle sensing ---
 DEPTH_TOPIC = "/camera/aligned_depth_to_color/image_raw"   # 16UC1, mm
 CINFO_TOPIC = "/camera/color/camera_info"
-N_SECTORS = 7                  # split the FOV into this many forward sectors
+N_SECTORS = 14                  # split the FOV into this many forward sectors
 BAND_ABOVE = 20                # depth rows used: [cy-BAND_ABOVE, cy+BAND_BELOW]
 BAND_BELOW = 10                # (tight band near the optical center -> walls, little floor)
-INFLUENCE = 1.00               # m, start being pushed by obstacles within this
+INFLUENCE = 1.0               # m, start being pushed by obstacles within this
 HARD_STOP = 0.35               # m, nearest-front distance that forces a full stop
 SLOW_RANGE = 0.70              # m, below this clearance scales the speed down
 MIN_VALID = 0.15               # m, ignore depth nearer than this (noise)
@@ -89,15 +89,16 @@ RATE_HZ = 10.0
 V_MAX = 60.0
 V_MIN = 20.0
 KP_LIN = 90.0
-W_ATT = 1.0                    # attractive weight (unit goal vector)
-REP_GAIN = 1.6                 # per-sector repulsive gain (tune on hardware)
+W_ATT = 1.0                    # (legacy; heading = goal bearing + bounded steer)
+REP_GAIN = 2.0                 # obstacle STEER gain: normalized rep_left -> steer radians
+MAX_STEER = math.radians(80)   # cap on how far obstacles can steer off the goal heading
 POS_TOL = 0.12
 YAW_TOL = math.radians(8)
 YAW_KP = 0.8
 YAW_RATE_MAX = 0.35
 YAW_MIN = 0.12                  # min yaw magnitude to overcome rotation deadband
 ALIGN_ENTER = math.radians(12)  # heading err within this -> start driving forward
-ALIGN_EXIT = math.radians(30)   # heading err beyond this -> stop & rotate (hysteresis)
+ALIGN_EXIT = math.radians(60)   # heading err beyond this -> stop & rotate (hysteresis)
 TIMEOUT_S = 90.0
 
 _depth = {"img": None, "stamp": None}
@@ -153,6 +154,7 @@ def obstacle_field():
     with np.errstate(all="ignore"):
         col_range = np.nanmin(band, axis=0)             # (w,)
     rep_fwd = rep_left = 0.0
+    n_hit = 0
     min_front = float("inf")
     edges = np.linspace(0, w, N_SECTORS + 1).astype(int)
     for s in range(N_SECTORS):
@@ -170,9 +172,13 @@ def obstacle_field():
         if abs(uc - cx) < 0.30 * w:                     # central sectors gate the stop
             min_front = min(min_front, d)
         if d < INFLUENCE:
-            wgt = REP_GAIN * (INFLUENCE - d) / INFLUENCE
+            wgt = (INFLUENCE - d) / INFLUENCE            # 0..1 by proximity
             rep_fwd += -fwd / d * wgt                    # push opposite the obstacle
             rep_left += -left / d * wgt
+            n_hit += 1
+    if n_hit > 0:                                       # AVERAGE -> magnitude ~[0,1],
+        rep_fwd /= n_hit                                # independent of N_SECTORS so a
+        rep_left /= n_hit                               # wall can't dwarf the goal pull
     return rep_fwd, rep_left, min_front
 
 
@@ -250,42 +256,46 @@ def main():
                     sys.stdout.write("\r depth stale -> hold        "); sys.stdout.flush()
                     rate.sleep(); continue
 
-                # desired heading = goal-attractive + obstacle-repulsive, in the
-                # chassis frame (camera yaw corrected by HEADING_OFFSET_DEG).
+                # too close head-on -> clean SAFE-STOP (don't oscillate; reposition)
+                if min_front < HARD_STOP:
+                    pub.publish(SetVelocity())
+                    aligned = False
+                    sys.stdout.write("\r WALL %.2fm < %.2f -> STOP (reposition / abort)   "
+                                     % (min_front, HARD_STOP)); sys.stdout.flush()
+                    rate.sleep(); continue
+
+                # Heading = goal bearing + a BOUNDED obstacle steer (lateral only,
+                # normalized) -- never reverses, so no in-place yaw oscillation.
+                # rep_left>0 == obstacles on the right -> steer left (+).
                 chassis_yaw = ryaw - math.radians(HEADING_OFFSET_DEG)
                 bearing = norm_angle(math.atan2(dy, dx) - chassis_yaw)
-                tot_fwd = W_ATT * math.cos(bearing) + rep_fwd
-                tot_left = W_ATT * math.sin(bearing) + rep_left
-                if math.hypot(tot_fwd, tot_left) < 1e-3:
-                    tot_fwd, tot_left = math.cos(bearing), math.sin(bearing)
-                head_err = math.atan2(tot_left, tot_fwd)     # CCW from forward
+                steer = max(-MAX_STEER, min(MAX_STEER, REP_GAIN * rep_left))
+                head_err = norm_angle(bearing + steer)
 
                 # NO strafing: rotate in place (yaw only) to face head_err, then
-                # drive straight forward (forward only). Camera always faces the
-                # travel direction -> no sideways blind spot. Hysteresis between
-                # the two states avoids chattering.
+                # drive straight forward (forward only). Hysteresis avoids chatter.
                 if aligned and abs(head_err) > ALIGN_EXIT:
                     aligned = False
                 elif (not aligned) and abs(head_err) <= ALIGN_ENTER:
                     aligned = True
-                if aligned and min_front < HARD_STOP:
-                    aligned = False                          # wall ahead -> turn away
 
                 if not aligned:
                     wv = max(-YAW_RATE_MAX, min(YAW_RATE_MAX, YAW_KP * head_err))
                     if 0.0 < abs(wv) < YAW_MIN:
                         wv = math.copysign(YAW_MIN, wv)
                     pub.publish(SetVelocity(velocity=0.0, direction=90.0, angular=wv))
-                    sys.stdout.write("\r turn:  head_err=%+.0fdeg  w=%+.2f  front=%.2f   "
-                                     % (math.degrees(head_err), wv, min_front)); sys.stdout.flush()
+                    sys.stdout.write("\r turn:  head_err=%+.0f  steer=%+.0f  w=%+.2f  front=%.2f   "
+                                     % (math.degrees(head_err), math.degrees(steer), wv, min_front))
+                    sys.stdout.flush()
                 else:
                     clearance = 1.0
                     if min_front < SLOW_RANGE:
                         clearance = max(0.0, (min_front - HARD_STOP) / (SLOW_RANGE - HARD_STOP))
                     vel = max(V_MIN, min(V_MAX, KP_LIN * dist)) * clearance
                     pub.publish(SetVelocity(velocity=vel, direction=90.0, angular=0.0))
-                    sys.stdout.write("\r fwd:   dist=%.2f  front=%.2f  v=%.0f  head_err=%+.0fdeg   "
-                                     % (dist, min_front, vel, math.degrees(head_err))); sys.stdout.flush()
+                    sys.stdout.write("\r fwd:   dist=%.2f  front=%.2f  v=%.0f  head_err=%+.0f  steer=%+.0f   "
+                                     % (dist, min_front, vel, math.degrees(head_err), math.degrees(steer)))
+                    sys.stdout.flush()
 
             elif phase == "rotate":
                 yaw_err = norm_angle(goal_yaw - ryaw)
