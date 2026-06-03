@@ -14,7 +14,11 @@ A `pose_source` ROS param selects which source to publish:
   - "rtabmap" — only /rtabmap/odom
 
 The output is always geometry_msgs/PoseStamped on /robot_pose with
-frame_id = world_frame_name (default "map"), published at publish_hz Hz.
+frame_id = world_frame_name (default "map"), published at publish_hz Hz. The
+same fused pose is ALSO published as nav_msgs/Odometry on /odom (header
+frame_id = world_frame_name, child_frame_id = base_frame_name) so the real-robot
+nav stack gets an /odom even though the chassis publishes none. Twist is left
+zero (this is a pose-only odom).
 
 This satisfies the A4 Topic 2 rubric requirement for a "localization
 manager" while letting us pick the most reliable source for a demo
@@ -38,6 +42,7 @@ class LocalizationManager:
         self.robot_model_name  = rospy.get_param("~robot_model_name", "nexus_4wd_mecanum")
         self.tag_freshness_s   = rospy.get_param("~tag_freshness_s", 1.0)
         self.publish_hz        = rospy.get_param("~publish_hz", 20.0)
+        self.base_frame_name   = rospy.get_param("~base_frame_name", "base_footprint")
 
         self._lock = threading.Lock()
         self._latest_sim_gt = None       # PoseStamped or None
@@ -49,6 +54,7 @@ class LocalizationManager:
             self.pose_source = "auto"
 
         self.pub = rospy.Publisher("/robot_pose", PoseStamped, queue_size=10)
+        self.odom_pub = rospy.Publisher("/odom", Odometry, queue_size=10)
 
         rospy.Subscriber("/gazebo/model_states", ModelStates,
                          self._on_model_states, queue_size=1)
@@ -127,6 +133,16 @@ class LocalizationManager:
                 out.header.frame_id = self.world_frame_name
                 out.pose = ps.pose
                 self.pub.publish(out)
+
+                # Also republish the same fused pose as nav_msgs/Odometry on /odom
+                # (sim had /odom; the real chassis publishes none). Twist = zero.
+                odom = Odometry()
+                odom.header.stamp = out.header.stamp
+                odom.header.frame_id = self.world_frame_name
+                odom.child_frame_id = self.base_frame_name
+                odom.pose.pose = ps.pose
+                self.odom_pub.publish(odom)
+
                 if src != last_logged_source:
                     rospy.loginfo("[localization_manager] active source: %s", src)
                     last_logged_source = src
