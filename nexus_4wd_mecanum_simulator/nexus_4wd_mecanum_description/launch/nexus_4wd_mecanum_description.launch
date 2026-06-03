@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<launch>
+    <arg name="publish_gt_tf" default="true"/>
+
+    <param name="robot_description" command="$(find xacro)/xacro --inorder $(find slam)/nexus_4wd_mecanum_simulator/nexus_4wd_mecanum_description/urdf/nexus_4wd_mecanum.xacro" />
+
+    <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher" />
+
+    <node if="$(arg publish_gt_tf)" name="control_plugin" pkg="slam" type="control_plugin.py" output="screen"/>
+</launch>

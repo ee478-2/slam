@@ -1,0 +1,44 @@
+<launch>
+  <!-- One-shot evaluation launch for TUM freiburg2_pioneer_360.
+       Pipeline:
+         1. set use_sim_time
+         2. start RTAB-Map (via rtabmap.launch, with its tuned default args)
+         3. play the bag with sim clock, TF stripped, slow rate
+         4. record /pose and /rtabmap/odom into eval.bag
+       Stops automatically when the bag finishes (bag_player has
+       required=true). eval.bag lands in the directory where roslaunch
+       was started. -->
+
+  <arg name="bag"         default="$(find slam)/my_rtabmap/../data/rgbd_dataset_freiburg2_pioneer_360.bag"/>
+  <arg name="out_bag"     default="evaltest.bag"/>
+  <arg name="rate"        default="0.5"/>
+  <arg name="delay"       default="3.0"/>
+  <arg name="rtabmap_viz" default="true"/>  <!-- set false for headless batch eval -->
+  <!-- Override the full rtabmap arg string for parameter sweeps. Empty = use rtabmap.launch default. -->
+  <arg name="args"        default=""/>
+
+  <param name="/use_sim_time" value="true"/>
+
+  <!-- args is forwarded only when non-empty so the sweep can override
+       Odom/ResetCountdown (or any other param) without editing rtabmap.launch.
+       When empty, rtabmap.launch's tuned default is preserved. -->
+  <include file="$(find slam)/my_rtabmap/launch/rtabmap.launch">
+    <arg name="rtabmap_viz" value="$(arg rtabmap_viz)"/>
+    <arg if="$(eval len(args) > 0)" name="args" value="$(arg args)"/>
+  </include>
+
+  <node pkg="rosbag" type="record" name="bag_recorder"
+        args="-O $(arg out_bag) /pose /rtabmap/odom"
+        output="screen"/>
+        
+  <!-- Strip the bag's TF tree (world->kinect, odom->base_link, ...).
+       It conflicts with rtabmap_odom's odom->openni_rgb_optical_frame. -->
+  <node pkg="rosbag" type="play" name="bag_player"
+        args="--clock -r $(arg rate) -d $(arg delay) $(arg bag)"
+        required="true" output="screen">
+    <remap from="/tf"        to="/tf_unused"/>
+    <remap from="/tf_static" to="/tf_static_unused"/>
+  </node>
+
+  
+</launch>

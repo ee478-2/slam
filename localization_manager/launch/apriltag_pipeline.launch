@@ -1,0 +1,56 @@
+<?xml version="1.0"?>
+<!--
+  apriltag_pipeline.launch — Step 5 of A4 Topic 2.
+
+  Brings up:
+    - apriltag_ros continuous_detection on the simulator camera with our
+      bundle-aware tags.yaml (28 bundle ids spanning the 16 signboards).
+    - apriltag_localization_node, which consumes /tag_detections, looks
+      up each detected bundle's world-frame pose in re540_simulation.yaml,
+      and publishes geometry_msgs/PoseStamped on
+      /apriltag_localization_pose.
+
+  Run alongside re540_bringup.launch. Verify with
+    rostopic echo -n1 /tag_detections        # bundle detections
+    rostopic echo -n1 /apriltag_localization_pose
+-->
+<launch>
+  <arg name="camera_name"          default="camera"/>
+  <arg name="image_topic"          default="color/image_raw"/>
+  <arg name="node_namespace"       default="apriltag_ros_continuous_node"/>
+  <arg name="tags_file"            default="$(find slam)/localization_manager/config/tags.yaml"/>
+  <arg name="world_frame_name"     default="map"/>
+  <arg name="camera_frame_name"    default="camera_link"/>
+  <arg name="image_frame_name"     default="camera_color_optical_frame"/>
+  <arg name="apriltag_tag_config"  default="2025/re540_simulation"/>
+  <arg name="threshold_dist2tag"   default="2.0"/>
+  <arg name="broadcast_world2cam_tf" default="false"/>
+  <arg name="with_apriltag_localization" default="true"/>
+
+  <!-- apriltag_ros continuous detection, configured for the simulator
+       RealSense and our custom tags.yaml. -->
+  <rosparam command="load" file="$(find apriltag_ros)/config/settings.yaml"
+            ns="$(arg node_namespace)"/>
+  <rosparam command="load" file="$(arg tags_file)"
+            ns="$(arg node_namespace)"/>
+
+  <node pkg="apriltag_ros" type="apriltag_ros_continuous_node"
+        name="$(arg node_namespace)" clear_params="true" output="screen">
+    <remap from="image_rect"  to="/$(arg camera_name)/$(arg image_topic)"/>
+    <remap from="camera_info" to="/$(arg camera_name)/camera_info"/>
+    <param name="publish_tag_detections_image" type="bool" value="true"/>
+  </node>
+
+  <!-- AprilTag-based global pose estimator. -->
+  <group if="$(arg with_apriltag_localization)">
+    <node pkg="slam" type="apriltag_localization_node"
+          name="apriltag_localization_node" output="screen">
+      <param name="tag_config_name"        value="$(arg apriltag_tag_config)"/>
+      <param name="world_frame_name"       value="$(arg world_frame_name)"/>
+      <param name="camera_frame_name"      value="$(arg camera_frame_name)"/>
+      <param name="image_frame_name"       value="$(arg image_frame_name)"/>
+      <param name="broadcast_world2cam_tf" value="$(arg broadcast_world2cam_tf)"/>
+      <param name="threshold_dist"         value="$(arg threshold_dist2tag)"/>
+    </node>
+  </group>
+</launch>

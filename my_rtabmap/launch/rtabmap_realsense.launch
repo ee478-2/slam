@@ -1,0 +1,66 @@
+<?xml version="1.0"?>
+<!--
+  rtabmap_realsense.launch — RTAB-Map on a LIVE RealSense D435.
+
+  This is the REAL-camera counterpart to rtabmap.launch (which is set up
+  for TUM-RGBD bags / sim, use_sim_time=true). Use this one with a
+  physical RealSense plugged in over USB.
+
+  By default this launch subscribes to an already-running RealSense driver.
+  Start the camera once with:
+    roslaunch realsense2_camera rs_camera.launch align_depth:=true
+
+  For a standalone test with no existing camera driver, pass:
+    launch_realsense:=true
+
+  On the real robot: the D435 lives on the Jetson Orin. Run this on the
+  Jetson (or on a laptop the D435 is plugged into) with the Pi's roscore
+  as ROS master:
+    export ROS_MASTER_URI=http://192.168.0.200:11311
+    export ROS_IP=<this machine's IP>
+
+  Verify in RViz / rtabmap_viz:
+    /rtabmap/mapData, /rtabmap/cloud_map, /rtabmap/odom
+-->
+<launch>
+  <arg name="rviz"          default="true"/>
+  <arg name="rtabmap_viz"   default="false"/>
+  <arg name="localization"  default="false"/>
+  <arg name="rtabmap_args"  default="--delete_db_on_start"/>
+  <arg name="launch_realsense" default="false"/>
+
+  <!-- 1) RealSense D435 driver (depth aligned to color).
+       align_depth:=true runs the alignment node: depth is resampled into
+       the COLOR camera's pixel grid + intrinsics, so /color/image_raw and
+       /aligned_depth_to_color/image_raw are pixel-aligned and share
+       /color/camera_info. This resolves the RGB-vs-depth FOV/resolution
+       mismatch that caused the HW3 sim drift (d34be11) — on the real
+       driver we do NOT hand-match sensor configs.
+       Resolution 848x480: D435 sensors are natively 16:9, so 4:3 modes
+       (e.g. 640x480) crop and narrow the color HFOV. 848x480 keeps the
+       full FOV and is the D435's optimal/native depth mode. -->
+  <include if="$(arg launch_realsense)"
+           file="$(find realsense2_camera)/launch/rs_camera.launch">
+    <arg name="align_depth"  value="true"/>
+    <arg name="enable_gyro"  value="false"/>
+    <arg name="enable_accel" value="false"/>
+    <arg name="color_width"  value="848"/>
+    <arg name="color_height" value="480"/>
+    <arg name="depth_width"  value="848"/>
+    <arg name="depth_height" value="480"/>
+  </include>
+
+  <!-- 2) RTAB-Map RGB-D SLAM (rgbd_odometry + rtabmap + viz). -->
+  <include file="$(find rtabmap_launch)/launch/rtabmap.launch">
+    <arg name="rtabmap_args"      value="$(arg rtabmap_args)"/>
+    <arg name="rgb_topic"         value="/camera/color/image_raw"/>
+    <arg name="depth_topic"       value="/camera/aligned_depth_to_color/image_raw"/>
+    <arg name="camera_info_topic" value="/camera/color/camera_info"/>
+    <arg name="frame_id"          value="camera_link"/>
+    <arg name="approx_sync"       value="true"/>
+    <arg name="visual_odometry"   value="true"/>
+    <arg name="rtabmap_viz"       value="$(arg rtabmap_viz)"/>
+    <arg name="rviz"              value="$(arg rviz)"/>
+    <arg name="localization"      value="$(arg localization)"/>
+  </include>
+</launch>

@@ -18,6 +18,10 @@ __pycache__/
 *.db
 *.pyc
 
+# 16 MB third-party mesh — exceeds the 10 MB commit rule; re-fetch from the
+# realsense_gazebo_plugin upstream when the simulator needs it.
+nexus_4wd_mecanum_simulator/realsense_gazebo_plugin/meshes/d435.dae
+
 # --- Editor / OS ---
 .vscode/
 .idea/

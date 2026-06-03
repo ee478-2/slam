@@ -1,0 +1,46 @@
+cmake_minimum_required(VERSION 3.0.2)
+project(re540_final_map)
+
+find_package(catkin REQUIRED)
+
+catkin_package()
+
+# Prepend this package to GAZEBO_RESOURCE_PATH / GAZEBO_MODEL_PATH so
+# the final_map.world's file://materials/... and file://models/... URIs resolve.
+catkin_add_env_hooks(99.re540_gazebo_paths
+  SHELLS sh
+  DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/cmake/env-hooks)
+
+# Install scripts
+install(PROGRAMS
+  scripts/fix_world_paths.py
+  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)
+
+# Install materials
+install(DIRECTORY materials/
+  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/materials
+  PATTERN ".svn" EXCLUDE
+)
+
+# Install worlds
+install(DIRECTORY worlds/
+  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/worlds
+  PATTERN ".svn" EXCLUDE
+)
+
+# Install models
+install(FILES
+  model.config
+  model.sdf
+  final_map.dae
+  Final_map.stl
+  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/models
+)
+
+# Install figure directory
+install(DIRECTORY figure/
+  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/figure
+  PATTERN ".svn" EXCLUDE
+)
+

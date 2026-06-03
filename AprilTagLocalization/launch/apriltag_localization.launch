@@ -1,0 +1,44 @@
+<launch>
+    <arg name="tag_file_name" default="2025/re540_n1_room111"/>
+
+    <arg name="camera_name" default="camera"/>
+    <arg name="image_topic" default="color/image_raw"/>
+    <arg name="threshold_dist2tag" default="2.0"/>
+
+    <arg name="world_frame_name" default="map"/>
+    <arg name="camera_frame_name" default="camera_link"/>
+    <arg name="image_frame_name" default="camera_color_optical_frame"/>
+
+    <arg name="with_apriltag_ros" default="true"/>
+    <arg name="with_visualization" default="true"/>
+    <arg name="with_realsense_tf" default="true"/>
+
+    <arg name="broadcast_world2cam_tf" default="true"/>
+
+
+    <group if="$(arg with_apriltag_ros)">
+        <include file="$(find apriltag_ros)/launch/continuous_detection.launch">
+            <arg name="camera_name" value="$(arg camera_name)"/>
+            <arg name="image_topic" value="$(arg image_topic)"/>
+        </include>
+    </group>
+
+    <node name="apriltag_localization_node" pkg="slam" type="apriltag_localization_node" output="screen">
+        <param name="tag_config_name" value="$(arg tag_file_name)"/>
+        <param name="world_frame_name" value="$(arg world_frame_name)"/>
+        <param name="camera_frame_name" value="$(arg camera_frame_name)"/>
+        <param name="image_frame_name" value="$(arg image_frame_name)"/>
+        <param name="broadcast_world2cam_tf" value="$(arg broadcast_world2cam_tf)"/>
+        <param name="threshold_dist" value="$(arg threshold_dist2tag)"/>
+    </node>
+
+    <group if="$(arg with_visualization)">
+        <node name="apriltag_localization_visualization" pkg="rviz" type="rviz" args="-d $(find slam)/AprilTagLocalization/rviz/rviz_config.rviz"/>
+    </group>
+
+    <group if="$(arg with_realsense_tf)">
+        <param name="robot_description" command="$(find xacro)/xacro --inorder '$(find realsense2_description)/urdf/test_d435_camera.urdf.xacro' use_nominal_extrinsics:=true" />
+        <node name="realsense_tf_publisher" pkg="robot_state_publisher" type="robot_state_publisher" />
+    </group>
+    
+</launch>
