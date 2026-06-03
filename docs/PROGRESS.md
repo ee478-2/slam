@@ -1,5 +1,21 @@
 # Progress
 
+## 2026-06-03 (Claude skills for the perception stack lifecycle)
+
+Captured the repeated real-robot bring-up/teardown — and its hard-won gotchas —
+as three project Claude skills under `.claude/skills/` so the workflow is
+reproducible across sessions:
+- `slam-bringup` — preflight (Pi roscore/ARP, D435 USB) → camera (USB2 recipe) →
+  rtabmap (ResetCountdown=1) → teleop → optional viz on `:1`.
+- `slam-mapmon` — live map-node / loop-closure / VO good-lost / travel monitor.
+  Encodes the two field gotchas: count nodes via `graph.poses` (not `nodes`),
+  and read VO-lost from `msg.pose.covariance[0]` (not `pose.pose`).
+- `slam-shutdown` — **SIGINT-only** teardown (consumers before camera) to avoid
+  the D435 USB wedge.
+- Also fixed teleop input lag (`64fb713`): drain the stdin buffer each tick
+  instead of one byte per 50 ms (key auto-repeat was queuing), and raised the
+  linear-speed cap 30 → 75 (2.5x).
+
 ## 2026-06-03 (rtabmap real map-building VERIFIED + VO fail-fast fix)
 
 Resumed the on-Jetson real test: re-confirmed teleop, then ran rtabmap RGB-D
