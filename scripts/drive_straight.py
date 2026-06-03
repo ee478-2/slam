@@ -26,11 +26,16 @@ Run with the robot's roscore as master:
     export ROS_IP=<this machine's IP>
 """
 
+import signal
 import struct
 import sys
 
 import genpy
 import rospy
+
+
+def _raise_kbi():
+    raise KeyboardInterrupt
 
 
 class SetVelocity(genpy.Message):
@@ -92,6 +97,7 @@ def main():
     rospy.init_node("drive_straight", anonymous=True, disable_signals=True)
     pub = rospy.Publisher("/chassis_control/set_velocity", SetVelocity,
                           queue_size=1, latch=False)
+    signal.signal(signal.SIGTERM, lambda *_: _raise_kbi())   # kill/timeout -> stop via finally
     rospy.sleep(0.5)   # let the publisher connect before the first command
 
     go = SetVelocity(velocity=velocity, direction=FORWARD, angular=0.0)

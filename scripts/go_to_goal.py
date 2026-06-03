@@ -25,12 +25,17 @@ stops). A max-runtime timeout also stops it.
 """
 
 import math
+import signal
 import struct
 import sys
 
 import genpy
 import rospy
 import tf2_ros
+
+
+def _raise_kbi():
+    raise KeyboardInterrupt
 
 
 class SetVelocity(genpy.Message):
@@ -110,6 +115,7 @@ def main():
     rospy.init_node("go_to_goal", anonymous=True, disable_signals=True)
     pub = rospy.Publisher("/chassis_control/set_velocity", SetVelocity,
                           queue_size=1, latch=False)
+    signal.signal(signal.SIGTERM, lambda *_: _raise_kbi())   # kill/timeout -> stop via finally
     tf_buf = tf2_ros.Buffer()
     tf2_ros.TransformListener(tf_buf)
     rospy.sleep(0.6)   # let TF + the publisher connection come up
