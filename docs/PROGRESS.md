@@ -1,5 +1,20 @@
 # Progress
 
+## 2026-06-03 (/odom: launch localization_manager with the stack)
+
+- `/odom` was absent on the real robot not because of code but because
+  **`localization_manager_node` was never launched** — `slam up` brought up
+  cam+rtab+tags only, and the node is started solely by
+  `localization_manager.launch`. The `/odom` (+`/robot_pose`) publisher exists
+  (`a3d8418`) but had no runner.
+- Fixed in `scripts/slam_aliases.sh` (`95721c5`): new **`slam loc`** subcommand
+  (`localization_manager.launch` -> `/tmp/locman.log`); **`slam up`** now does
+  `cam->rtab->tags->loc`; **`slam down`** SIGINTs it before the camera; `help`
+  lists it. `pose_source=auto` falls through tag->sim_gt->rtabmap, so on the real
+  robot it republishes `/rtabmap/odom` as `/odom` (child_frame `base_link`, twist
+  zero). Verified `/odom` publishing live. (Commit also bundles in-progress cam
+  pointcloud + up header-wait tweaks.)
+
 ## 2026-06-03 (real-robot nav scripts + chassis-bug root cause + sim/eval cleanup)
 
 Moved from "drive the base" to "send it to a point," found why teleop drops
