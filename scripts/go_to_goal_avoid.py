@@ -8,9 +8,11 @@ It is go_to_goal.py + a reactive potential field:
   * repulsive vector   -> away from near obstacles seen in the depth image,
                           summed over a few forward sectors (the idea borrowed
                           from the DWA node's computeEscapeDir escape vector)
-The sum is driven holonomically (direction + velocity), so it slides around
-walls instead of ramming them. Near a wall it slows; too close it SAFE-STOPS
-(the camera only sees the front ~87 deg FOV, so we stay conservative).
+The sum gives a desired heading. To avoid sideways blind spots (the camera only
+sees the front ~87 deg FOV), the base does NOT strafe: it either rotates in
+place (yaw only) to face that heading, or drives straight forward (forward only)
+-- so the camera always faces the travel direction. Near a wall it slows; too
+close it turns away / SAFE-STOPS.
 
 Usage:
     rosrun slam go_to_goal_avoid.py <x> <y> [yaw_deg]
@@ -93,6 +95,9 @@ POS_TOL = 0.12
 YAW_TOL = math.radians(8)
 YAW_KP = 0.8
 YAW_RATE_MAX = 0.35
+YAW_MIN = 0.12                  # min yaw magnitude to overcome rotation deadband
+ALIGN_ENTER = math.radians(12)  # heading err within this -> start driving forward
+ALIGN_EXIT = math.radians(30)   # heading err beyond this -> stop & rotate (hysteresis)
 TIMEOUT_S = 90.0
 
 _depth = {"img": None, "stamp": None}
@@ -198,6 +203,7 @@ def main():
     start = rospy.get_time()
     miss = 0
     phase = "drive"
+    aligned = False
     print("goal=(%.2f, %.2f)%s  avoid: front depth, influence=%.2fm stop=%.2fm  Ctrl-C aborts"
           % (gx, gy, "" if goal_yaw is None else " yaw=%.0f" % math.degrees(goal_yaw),
              INFLUENCE, HARD_STOP))
@@ -243,31 +249,43 @@ def main():
                     pub.publish(SetVelocity())
                     sys.stdout.write("\r depth stale -> hold        "); sys.stdout.flush()
                     rate.sleep(); continue
-                if min_front < HARD_STOP:
-                    pub.publish(SetVelocity())
-                    sys.stdout.write("\r WALL %.2fm < %.2f -> STOP (steer away or back off)   "
-                                     % (min_front, HARD_STOP)); sys.stdout.flush()
-                    rate.sleep(); continue
 
-                # attractive (unit) toward goal, in the robot frame
-                bearing = norm_angle(math.atan2(dy, dx) - ryaw)
-                att_fwd, att_left = math.cos(bearing), math.sin(bearing)
-                tot_fwd = W_ATT * att_fwd + rep_fwd
-                tot_left = W_ATT * att_left + rep_left
+                # desired heading = goal-attractive + obstacle-repulsive, in the
+                # chassis frame (camera yaw corrected by HEADING_OFFSET_DEG).
+                chassis_yaw = ryaw - math.radians(HEADING_OFFSET_DEG)
+                bearing = norm_angle(math.atan2(dy, dx) - chassis_yaw)
+                tot_fwd = W_ATT * math.cos(bearing) + rep_fwd
+                tot_left = W_ATT * math.sin(bearing) + rep_left
                 if math.hypot(tot_fwd, tot_left) < 1e-3:
-                    tot_fwd, tot_left = att_fwd, att_left   # degenerate -> seek goal
+                    tot_fwd, tot_left = math.cos(bearing), math.sin(bearing)
+                head_err = math.atan2(tot_left, tot_fwd)     # CCW from forward
 
-                desired = math.atan2(tot_left, tot_fwd)      # CCW from forward
-                direction = (90.0 + math.degrees(desired) + HEADING_OFFSET_DEG) % 360.0
-                clearance = 1.0
-                if min_front < SLOW_RANGE:
-                    clearance = max(0.0, (min_front - HARD_STOP) / (SLOW_RANGE - HARD_STOP))
-                vel = max(V_MIN, min(V_MAX, KP_LIN * dist)) * clearance
-                vel = max(vel, V_MIN * 0.5) if clearance > 0 else 0.0
-                pub.publish(SetVelocity(velocity=vel, direction=direction, angular=0.0))
-                sys.stdout.write("\r drive: dist=%.2f front=%.2f rep=(%.1f,%.1f) dir=%.0f v=%.0f   "
-                                 % (dist, min_front, rep_fwd, rep_left, direction, vel))
-                sys.stdout.flush()
+                # NO strafing: rotate in place (yaw only) to face head_err, then
+                # drive straight forward (forward only). Camera always faces the
+                # travel direction -> no sideways blind spot. Hysteresis between
+                # the two states avoids chattering.
+                if aligned and abs(head_err) > ALIGN_EXIT:
+                    aligned = False
+                elif (not aligned) and abs(head_err) <= ALIGN_ENTER:
+                    aligned = True
+                if aligned and min_front < HARD_STOP:
+                    aligned = False                          # wall ahead -> turn away
+
+                if not aligned:
+                    wv = max(-YAW_RATE_MAX, min(YAW_RATE_MAX, YAW_KP * head_err))
+                    if 0.0 < abs(wv) < YAW_MIN:
+                        wv = math.copysign(YAW_MIN, wv)
+                    pub.publish(SetVelocity(velocity=0.0, direction=90.0, angular=wv))
+                    sys.stdout.write("\r turn:  head_err=%+.0fdeg  w=%+.2f  front=%.2f   "
+                                     % (math.degrees(head_err), wv, min_front)); sys.stdout.flush()
+                else:
+                    clearance = 1.0
+                    if min_front < SLOW_RANGE:
+                        clearance = max(0.0, (min_front - HARD_STOP) / (SLOW_RANGE - HARD_STOP))
+                    vel = max(V_MIN, min(V_MAX, KP_LIN * dist)) * clearance
+                    pub.publish(SetVelocity(velocity=vel, direction=90.0, angular=0.0))
+                    sys.stdout.write("\r fwd:   dist=%.2f  front=%.2f  v=%.0f  head_err=%+.0fdeg   "
+                                     % (dist, min_front, vel, math.degrees(head_err))); sys.stdout.flush()
 
             elif phase == "rotate":
                 yaw_err = norm_angle(goal_yaw - ryaw)
