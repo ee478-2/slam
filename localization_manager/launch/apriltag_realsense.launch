@@ -1,0 +1,39 @@
+<?xml version="1.0"?>
+<!--
+  apriltag_realsense.launch — AprilTag detection on the LIVE RealSense D435.
+
+  Real-camera counterpart to apriltag_pipeline.launch (which is wired for the
+  Gazebo sim camera + the sim apriltag_localization world config). This one:
+    - runs apriltag_ros continuous_detection on the real D435 color stream,
+    - loads our bundle-aware tags.yaml (tag36h11),
+    - publishes /tag_detections (+ /tag_detections_image),
+    - does NOT launch the sim apriltag_localization_node.
+
+  Pairs with rtabmap_realsense.launch: rtabmap subscribes to /tag_detections
+  and adds each detected tag as a LANDMARK in its graph (map frame, not the
+  global_map.yaml world frame — that absolute-localization wiring is separate).
+
+  The D435 color is low-distortion, so we feed color/image_raw as image_rect
+  (no rectify node). Verify:
+    rostopic echo -n1 /tag_detections      # detected ids
+    rostopic hz /tag_detections_image      # overlay image
+-->
+<launch>
+  <arg name="camera_name"     default="camera"/>
+  <arg name="image_topic"     default="/camera/color/image_raw"/>
+  <arg name="camera_info"     default="/camera/color/camera_info"/>
+  <arg name="node_namespace"  default="apriltag_ros_continuous_node"/>
+  <arg name="tags_file"       default="$(find slam)/localization_manager/config/tags.yaml"/>
+
+  <rosparam command="load" file="$(find apriltag_ros)/config/settings.yaml"
+            ns="$(arg node_namespace)"/>
+  <rosparam command="load" file="$(arg tags_file)"
+            ns="$(arg node_namespace)"/>
+
+  <node pkg="apriltag_ros" type="apriltag_ros_continuous_node"
+        name="$(arg node_namespace)" clear_params="true" output="screen">
+    <remap from="image_rect"  to="$(arg image_topic)"/>
+    <remap from="camera_info" to="$(arg camera_info)"/>
+    <param name="publish_tag_detections_image" type="bool" value="true"/>
+  </node>
+</launch>
