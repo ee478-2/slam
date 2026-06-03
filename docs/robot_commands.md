@@ -151,17 +151,19 @@ roswtf                                  # general health check
 These run on the client because the Pi is too weak. The client shares
 the Pi's `roscore` (set `ROS_MASTER_URI` per §0).
 
-**RTAB-Map** — needs the RealSense D435 (plugged into the Jetson, or the
-laptop directly):
+**RTAB-Map** — needs the RealSense D435 (on the Jetson). The full client-side
+recipe (USB2 camera bring-up, apriltag, YOLO, teleop, viewers, SIGINT shutdown,
+and the monitoring one-liners) is in **`docs/slam_commands.md`**. Quick start
+(camera already up):
 ```bash
-source ~/llm-skill/devel/setup.bash
-roslaunch my_rtabmap rtabmap_realsense.launch
-# RViz shows the map; carry the camera to build it + loop-close.
+source ~/catkin_ws/devel/setup.bash
+roslaunch slam rtabmap_realsense.launch rviz:=false rtabmap_viz:=false
 ```
 
-**Signboard recognition on the real USB cam**:
+**Signboard recognition on the real USB cam** (the `signboard_recognition`
+package now lives in `llm_agent/`, reference-only — but the launch still runs):
 ```bash
-source ~/llm-skill/devel/setup.bash
+source ~/catkin_ws/devel/setup.bash
 roslaunch signboard_recognition signboard_recognition_real.launch
 rqt_image_view /signboards/detections_image
 rostopic echo  /signboards/detections
@@ -177,6 +179,6 @@ rostopic echo  /signboards/detections
 3. chassis forward / back / rotate / STOP        (§3)
 4. arm joint1/joint2 + gripper open/close        (§4)
 5. hold an AprilTag in front of the camera       (§5)
-6. (client) roslaunch my_rtabmap rtabmap_realsense.launch
+6. (client) roslaunch slam rtabmap_realsense.launch    # see docs/slam_commands.md
 7. (client) roslaunch signboard_recognition signboard_recognition_real.launch
 ```
