@@ -26,16 +26,21 @@ slam() {
         echo "camera already running — run 'slam down' first (else it races device-busy)"; return 1; fi
       setsid roslaunch realsense2_camera rs_camera.launch \
         enable_depth:=true align_depth:=true enable_color:=true \
+        enable_sync:=true enable_pointcloud:=true \
         enable_infra1:=false enable_infra2:=false enable_gyro:=false enable_accel:=false \
         color_width:=640 color_height:=480 color_fps:=15 \
         depth_width:=640 depth_height:=480 depth_fps:=15 >/tmp/rs_camera.log 2>&1 &
-      echo "camera (USB2 640x480@15) -> /tmp/rs_camera.log" ;;
+      echo "camera (USB2 640x480@15 + pointcloud) -> /tmp/rs_camera.log" ;;
 
     rtab)  setsid roslaunch slam rtabmap_realsense.launch rviz:=false rtabmap_viz:=false \
              >/tmp/rtabmap.log 2>&1 & echo "rtabmap -> /tmp/rtabmap.log" ;;
 
     tags)  setsid roslaunch slam apriltag_realsense.launch >/tmp/apriltag.log 2>&1 & \
              echo "apriltag -> /tmp/apriltag.log" ;;
+
+    loc)   # localization_manager: fuses tag/rtabmap pose -> /robot_pose + /odom
+           setsid roslaunch slam localization_manager.launch >/tmp/locman.log 2>&1 & \
+             echo "localization_manager (/odom + /robot_pose) -> /tmp/locman.log" ;;
 
     yolo)  setsid rosrun manipulation_control object_detection.py \
              _base_frame:=camera_link _visualize:=true _inference_hz:=8.0 \
@@ -50,10 +55,17 @@ slam() {
     up)    slam env; slam cam
            echo "...waiting for camera to actually stream"
            local i; for i in $(seq 1 20); do
-             timeout 2 rostopic echo -n1 /camera/color/image_raw >/dev/null 2>&1 && { echo "camera streaming"; break; }
+             timeout 2 rostopic echo -n1 /camera/color/image_raw/header >/dev/null 2>&1 && { echo "camera streaming"; break; }
              sleep 1; done
-           slam rtab; slam tags
-           echo "stack up (camera+rtabmap+apriltag). NOTE: RViz is SEPARATE -> 'slam rviz' (on :1), or run rviz on your PC." ;;
+           echo "...waiting for pointcloud"
+           for i in $(seq 1 20); do
+             timeout 2 rostopic echo -n1 /camera/depth/color/points/header >/dev/null 2>&1 && { echo "pointcloud streaming"; break; }
+             sleep 1; done
+           timeout 2 rostopic echo -n1 /camera/depth/color/points/header >/dev/null 2>&1 || { echo "pointcloud did not stream; tail /tmp/rs_camera.log"; tail -n 80 /tmp/rs_camera.log; return 1; }
+           slam rtab; slam tags; slam loc
+           echo "stack up (camera+rtabmap+apriltag+localization). /odom + /robot_pose"
+           echo "  appear once rtabmap odom (or a tag) is flowing — check: rostopic hz /odom"
+           echo "NOTE: RViz is SEPARATE -> 'slam rviz' (on :1), or run rviz on your PC." ;;
 
     mon)   python3 - <<'PY'
 import rospy,time,math
@@ -98,6 +110,7 @@ PY
 
     down)  # SIGINT-only for the camera; consumers first
       pkill -INT -f 'rtabmap_viz/rtabmap_viz' 2>/dev/null
+      pkill -INT -f 'roslaunch slam localization_manager' 2>/dev/null
       pkill -INT -f 'roslaunch slam apriltag_realsense' 2>/dev/null
       pkill -INT -f 'roslaunch slam rtabmap_realsense' 2>/dev/null
       pkill -f 'object_detection.py' 2>/dev/null
@@ -112,10 +125,11 @@ PY
     help|*) cat <<EOF
 slam <cmd>:
   env           source workspace + set ROS master/IP
-  up            env + cam + rtab + tags  (full perception bring-up)
+  up            env + cam + rtab + tags + loc  (full perception bring-up)
   cam           RealSense camera (USB2 recipe)
   rtab          rtabmap RGB-D SLAM
   tags          apriltag detection (+ rtabmap landmarks)
+  loc           localization_manager -> /robot_pose + /odom
   yolo          YOLO object detection
   teleop        keyboard teleop (foreground)
   rviz [name]   rviz on $SLAM_DISPLAY (default apriltag_rtabmap; or: slam rviz yolo)
