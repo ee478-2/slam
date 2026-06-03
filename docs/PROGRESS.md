@@ -1,5 +1,52 @@
 # Progress
 
+## 2026-06-03 (rtabmap real map-building VERIFIED + VO fail-fast fix)
+
+Resumed the on-Jetson real test: re-confirmed teleop, then ran rtabmap RGB-D
+SLAM live and closed the previously-open "map building" item. Drove the base
+with `scripts/teleop_keyboard.py` while rtabmap built the map over the USB2
+camera link.
+
+### Result — map building PASSED
+- Drove ~2.9 m: graph grew to **50 map nodes**, `/rtabmap/cloud_map` =
+  **67,803 points**. VO **0 lost frames / 425** during the slow drive.
+- Camera held the validated USB2 recipe (color+depth 15.0 Hz, 0 libusb warnings,
+  640x480, IR+IMU off).
+
+### The fix that made it work — `Odom/ResetCountdown=1`
+- First drive attempt **wedged**: VO went `quality=0`, `Not enough inliers
+  0/20 ... between -1 and N`, pose frozen at origin, map stuck at 1 node, and
+  the rtabmap node logged `Did not receive data since 5 seconds`. Camera was
+  fine the whole time (still 15 Hz, 0 libusb) — the *odometry node* was lost.
+- Root cause: `rtabmap_realsense.launch` never set `Odom/ResetCountdown`, so it
+  used the rtabmap default **0 = never reset**. On the 15 fps USB2 stream a fast
+  move / in-place rotation breaks VO; with reset disabled it stays LOST forever
+  and the map stops growing. Same **V=1 fail-fast** lesson as the HW2/HW3 TUM
+  tuning.
+- Added `odom_args` pass-through (default `--Odom/ResetCountdown 1`) to
+  `rtabmap_realsense.launch` → `rtabmap.launch`. Re-drove slowly: 0 lost frames,
+  map grew cleanly.
+
+### Non-obvious gotcha (cost time)
+- `MapData.nodes` is published **incrementally** (only newly-added node data per
+  message), so a naive `len(msg.nodes)` reads ~1 even while the map has dozens
+  of nodes. Use **`len(msg.graph.poses)`** for the true node count (or the
+  `WM=NN` figure in the rtabmap node log).
+- The background launches were started with `setsid`, so the shell's `$!` /
+  job-control PID is the detached parent, not the live roslaunch. Find the real
+  PID with `pgrep -f 'roslaunch ...'`. **Stop with SIGINT only** (camera USB2
+  wedge hazard) — camera roslaunch and rtabmap roslaunch PIDs in
+  `/tmp/rs_camera.pid`, `/tmp/rtabmap.pid`.
+
+### Still open
+- **Loop closure** unverified — need to re-visit an already-mapped area to
+  trigger one (none seen yet; only forward exploration so far).
+- **AprilTag** detection still needs a physical tag in view.
+- **Wheel odometry** not wired: ArmPi chassis publishes no `/odom`; rtabmap runs
+  pure visual VO. Optional next step — publish wheel `/odom` and feed
+  `rgbd_odometry` as a motion guess (`guess_frame_id`) for better survival
+  through fast motion. Chassis node is outside `slam/` scope (reference/execute).
+
 ## 2026-06-03 (Jetson perception test PASSED — full RGB-D + rtabmap over USB2)
 
 Resumed the on-Jetson (Orin Nano) real-robot perception test after the earlier
@@ -234,7 +281,7 @@ all 10 functional. Stack overview:
 - `f1aad97` feat: re540 world bringup launch + env-hook + ground-truth
   doc. Headless smoke-test: `/camera/color/image_raw @ 30 Hz`;
   `/gazebo/model_states` lists 16 signboards + 8 stores.
-- `<after this>` feat: signboards.yaml (28 tag-id entries) + stores.yaml
+- `<after this>` feat: global_map.yaml signboards (28 tag-id entries) + stores.yaml
   (8 unknown-category entries). Mapping derived by cross-referencing the
   16 signboard PNGs with `tags.yaml` bundle slot x-offsets.
 - `<after this>` feat: `localization_manager` package — fuses

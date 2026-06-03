@@ -27,6 +27,13 @@
   <arg name="rtabmap_viz"   default="false"/>
   <arg name="localization"  default="false"/>
   <arg name="rtabmap_args"  default="--delete_db_on_start"/>
+  <!-- Odom/ResetCountdown=1: fail-fast VO recovery. On the USB2 15fps stream a
+       fast move/in-place rotation can break visual odometry; with the rtabmap
+       default (ResetCountdown=0, never reset) odom stays LOST forever and the
+       map stops growing. =1 resets the instant VO fails so it re-initialises
+       from the next good frame instead of wedging. (Same V=1 fail-fast finding
+       as the HW2/HW3 TUM tuning.) -->
+  <arg name="odom_args"     default="--Odom/ResetCountdown 1"/>
   <arg name="launch_realsense" default="false"/>
 
   <!-- 1) RealSense D435 driver (depth aligned to color).
@@ -53,6 +60,7 @@
   <!-- 2) RTAB-Map RGB-D SLAM (rgbd_odometry + rtabmap + viz). -->
   <include file="$(find rtabmap_launch)/launch/rtabmap.launch">
     <arg name="rtabmap_args"      value="$(arg rtabmap_args)"/>
+    <arg name="odom_args"         value="$(arg odom_args)"/>
     <arg name="rgb_topic"         value="/camera/color/image_raw"/>
     <arg name="depth_topic"       value="/camera/aligned_depth_to_color/image_raw"/>
     <arg name="camera_info_topic" value="/camera/color/camera_info"/>
