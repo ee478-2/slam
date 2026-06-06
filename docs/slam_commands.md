@@ -28,7 +28,7 @@ equivalents are the Claude skills `slam-bringup` / `slam-mapmon` / `slam-shutdow
 Source once, then one-word commands:
 ```bash
 source ~/catkin_ws/src/slam/scripts/slam_aliases.sh   # add to ~/.bashrc to make permanent
-slam up            # env + camera + wheel odom + rtabmap + apriltag
+slam up            # env + arm home + camera + wheel odom + rtabmap + apriltag
 slam wheel         # command-integrated /wheel/odom only
 slam teleop        # drive
 slam rviz          # viewer on :1   (slam rviz yolo for the YOLO view)
@@ -38,8 +38,9 @@ slam mon           # 15s map+VO monitor
 slam down          # SIGINT teardown (camera stopped last)
 slam help          # full list
 ```
-Individual steps: `slam env | cam | wheel | rtab | tags | yolo`. Override the Pi
-IP / GUI display with `SLAM_PI=...`, `SLAM_DISPLAY=:0` before sourcing.
+Individual steps: `slam env | arm-home | cam | wheel | rtab | tags | yolo`.
+Override the Pi IP / GUI display with `SLAM_PI=...`, `SLAM_DISPLAY=:0` before
+sourcing.
 
 The rest of this file is the long form of exactly what those shortcuts run.
 
@@ -59,6 +60,24 @@ ping -c1 -W1 192.168.0.200 && echo Pi-up || echo Pi-down   # roscore reachable?
 ip neigh show 192.168.0.200                                # FAILED = Pi off L2
 lsusb | grep -i 8086                                       # D435 = 8086:0b07
 rostopic info /chassis_control/set_velocity                # chassis subscribed?
+```
+
+---
+
+## 0b. Arm home pose
+
+`slam up` starts by opening the gripper and moving the arm to the default home
+pose through the Pi's existing controller topics:
+```bash
+setsid roslaunch slam arm_home.launch > /tmp/arm_home.log 2>&1 &
+```
+
+Defaults are radians, matching `joint1` through `joint5`:
+`0.0 0.7 -1.4 -1.0 0.0`; gripper open is `-1.20` on
+`/r_joint_controller/command`. Override for one run:
+```bash
+SLAM_ARM_HOME_POSE="0.0 0.7 -1.4 -1.0 0.0" \
+SLAM_GRIPPER_HOME_POSITION="-1.20" slam up
 ```
 
 ---

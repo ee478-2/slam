@@ -1,7 +1,7 @@
 # slam_aliases.sh — short commands for the perception/SLAM stack.
 #
 #   source ~/catkin_ws/src/slam/scripts/slam_aliases.sh
-#   slam up        # env + camera + wheel odom + rtabmap + apriltag
+#   slam up        # env + arm home + camera + wheel odom + rtabmap + apriltag
 #   slam help      # list everything
 #
 # Add the source line to ~/.bashrc to get it in every shell.
@@ -57,6 +57,13 @@ slam() {
            setsid roslaunch slam localization_manager.launch >/tmp/locman.log 2>&1 & \
              echo "localization_manager (/odom + /robot_pose) -> /tmp/locman.log" ;;
 
+    arm-home|arm_home)
+           local pose="${SLAM_ARM_HOME_POSE:-0.0 0.7 -1.4 -1.0 0.0}"
+           local gripper="${SLAM_GRIPPER_HOME_POSITION:--1.20}"
+           setsid roslaunch slam arm_home.launch home_pose:="$pose" \
+             gripper_position:="$gripper" >/tmp/arm_home.log 2>&1 & \
+             echo "arm home pose -> /tmp/arm_home.log" ;;
+
     yolo)  setsid rosrun manipulation_control object_detection.py \
              _base_frame:=camera_link _visualize:=true _inference_hz:=8.0 \
              >/tmp/yolo_det.log 2>&1 & echo "yolo -> /tmp/yolo_det.log" ;;
@@ -80,7 +87,7 @@ slam() {
       setsid roslaunch slam mission_viz.launch run_rviz:=false \
         >/tmp/mission_viz.log 2>&1 & echo "mission markers only -> /tmp/mission_viz.log" ;;
 
-    up)    slam env; slam cam
+    up)    slam env; slam arm-home; slam cam
            echo "...waiting for camera to actually stream"
            local i; for i in $(seq 1 20); do
              timeout 2 rostopic echo -n1 /camera/color/image_raw/header >/dev/null 2>&1 && { echo "camera streaming"; break; }
@@ -91,7 +98,7 @@ slam() {
              sleep 1; done
            timeout 2 rostopic echo -n1 /camera/depth/color/points/header >/dev/null 2>&1 || { echo "pointcloud did not stream; tail /tmp/rs_camera.log"; tail -n 80 /tmp/rs_camera.log; return 1; }
            slam wheel; slam rtab; slam tags; slam loc
-           echo "stack up (camera+wheel odom+rtabmap+apriltag+localization). /wheel/odom + /odom + /robot_pose"
+           echo "stack up (arm home+camera+wheel odom+rtabmap+apriltag+localization). /wheel/odom + /odom + /robot_pose"
            echo "  appear once rtabmap odom (or a tag) is flowing — check: rostopic hz /odom"
            echo "NOTE: RViz is SEPARATE -> 'slam rviz' (on :1), or run rviz on your PC." ;;
 
@@ -155,8 +162,9 @@ PY
     help|*) cat <<EOF
 slam <cmd>:
   env           source workspace + set ROS master/IP
-  up            env + cam + wheel + rtab + tags + loc  (full perception bring-up)
+  up            env + arm-home + cam + wheel + rtab + tags + loc  (full bring-up)
   cam           RealSense camera (USB2 recipe)
+  arm-home      open gripper + move arm to default home pose
   wheel         /wheel/odom from chassis commands (no TF by default)
   wheel-tf      /wheel/odom plus wheel_odom->base_link TF (isolated tests)
   rtab          rtabmap RGB-D SLAM

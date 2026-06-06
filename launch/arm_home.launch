@@ -1,0 +1,20 @@
+<launch>
+  <!-- Joint values are radians, matching the ArmPi controller topics. -->
+  <arg name="home_pose" default="0.0 0.7 -1.4 -1.0 0.0"/>
+  <arg name="gripper_position" default="-1.20"/>
+  <arg name="publish_gripper" default="true"/>
+  <arg name="gripper_publish_duration" default="0.75"/>
+  <arg name="arm_publish_duration" default="1.5"/>
+  <arg name="publish_hz" default="10.0"/>
+  <arg name="connection_timeout" default="2.0"/>
+
+  <node pkg="slam" type="arm_home_node.py" name="arm_home" output="screen">
+    <param name="home_pose" value="$(arg home_pose)"/>
+    <param name="gripper_position" value="$(arg gripper_position)"/>
+    <param name="publish_gripper" type="bool" value="$(arg publish_gripper)"/>
+    <param name="gripper_publish_duration" value="$(arg gripper_publish_duration)"/>
+    <param name="arm_publish_duration" value="$(arg arm_publish_duration)"/>
+    <param name="publish_hz" value="$(arg publish_hz)"/>
+    <param name="connection_timeout" value="$(arg connection_timeout)"/>
+  </node>
+</launch>
