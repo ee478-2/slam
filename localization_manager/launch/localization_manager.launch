@@ -8,9 +8,16 @@
     sim_gt     — only /gazebo/model_states (simulation-only)
     tag        — only /apriltag_localization_pose
     rtabmap    — only /rtabmap/odom
+
+  odom_source: rtabmap | selected
+    rtabmap  — publish /odom from continuous /rtabmap/odom (default; planner-safe)
+    selected — legacy behavior: publish selected fused pose on /odom
 -->
 <launch>
   <arg name="pose_source"       default="auto"/>
+  <arg name="odom_source"       default="rtabmap"/>
+  <arg name="odom_topic"        default="/odom"/>
+  <arg name="selected_odom_topic" default="/global_odom"/>
   <arg name="world_frame_name"  default="map"/>
   <arg name="robot_model_name"  default="nexus_4wd_mecanum"/>
   <arg name="tag_freshness_s"   default="1.0"/>
@@ -20,6 +27,9 @@
   <node pkg="slam" type="localization_manager_node.py"
         name="localization_manager" output="screen">
     <param name="pose_source"      value="$(arg pose_source)"/>
+    <param name="odom_source"      value="$(arg odom_source)"/>
+    <param name="odom_topic"       value="$(arg odom_topic)"/>
+    <param name="selected_odom_topic" value="$(arg selected_odom_topic)"/>
     <param name="world_frame_name" value="$(arg world_frame_name)"/>
     <param name="robot_model_name" value="$(arg robot_model_name)"/>
     <param name="tag_freshness_s"  value="$(arg tag_freshness_s)"/>
