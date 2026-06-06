@@ -69,6 +69,7 @@ target_link_libraries(apriltag_localization_node ${catkin_LIBRARIES} yaml-cpp)
 catkin_install_python(PROGRAMS
   localization_manager/scripts/localization_manager_node.py
   scripts/mission_viz_publisher.py
+  scripts/wheel_odom_node.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 

@@ -1,0 +1,36 @@
+<?xml version="1.0"?>
+<!--
+  wheel_odom.launch: publish /wheel/odom from ArmPi SetVelocity commands.
+
+  This is open-loop command integration because the stock Pi chassis node does
+  not expose encoder ticks. linear_scale converts the Hiwonder velocity command
+  into m/s; default 0.01 means velocity=40 integrates as 0.40 m/s.
+
+  publish_tf defaults false to avoid a duplicate base_link parent while
+  RTAB-Map is publishing odom->base_link. Enable only for isolated wheel-odom
+  tests or a launch configuration that deliberately owns that TF edge.
+-->
+<launch>
+  <arg name="cmd_topic"       default="/chassis_control/set_velocity"/>
+  <arg name="odom_topic"      default="/wheel/odom"/>
+  <arg name="odom_frame"      default="wheel_odom"/>
+  <arg name="base_frame"      default="base_link"/>
+  <arg name="publish_hz"      default="30.0"/>
+  <arg name="cmd_timeout_s"   default="0.5"/>
+  <arg name="linear_scale"    default="0.01"/>
+  <arg name="angular_scale"   default="1.0"/>
+  <arg name="publish_tf"      default="false"/>
+
+  <node pkg="slam" type="wheel_odom_node.py"
+        name="wheel_odom" output="screen">
+    <param name="cmd_topic"       value="$(arg cmd_topic)"/>
+    <param name="odom_topic"      value="$(arg odom_topic)"/>
+    <param name="odom_frame"      value="$(arg odom_frame)"/>
+    <param name="base_frame"      value="$(arg base_frame)"/>
+    <param name="publish_hz"      value="$(arg publish_hz)"/>
+    <param name="cmd_timeout_s"   value="$(arg cmd_timeout_s)"/>
+    <param name="linear_scale"    value="$(arg linear_scale)"/>
+    <param name="angular_scale"   value="$(arg angular_scale)"/>
+    <param name="publish_tf"      type="bool" value="$(arg publish_tf)"/>
+  </node>
+</launch>

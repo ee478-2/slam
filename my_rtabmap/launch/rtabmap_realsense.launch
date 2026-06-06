@@ -34,6 +34,9 @@
        from the next good frame instead of wedging. (Same V=1 fail-fast finding
        as the HW2/HW3 TUM tuning.) -->
   <arg name="odom_args"     default="--Odom/ResetCountdown 1"/>
+  <arg name="odom_guess_frame_id"        default=""/>
+  <arg name="odom_guess_min_translation" default="0"/>
+  <arg name="odom_guess_min_rotation"    default="0"/>
   <arg name="launch_realsense" default="false"/>
 
   <!-- Robot/camera frames + the base_link->camera_link mount, matching
@@ -92,6 +95,9 @@
     <arg name="frame_id"          value="$(arg base_frame)"/>
     <arg name="approx_sync"       value="true"/>
     <arg name="visual_odometry"   value="true"/>
+    <arg name="odom_guess_frame_id"        value="$(arg odom_guess_frame_id)"/>
+    <arg name="odom_guess_min_translation" value="$(arg odom_guess_min_translation)"/>
+    <arg name="odom_guess_min_rotation"    value="$(arg odom_guess_min_rotation)"/>
     <arg name="rtabmap_viz"       value="$(arg rtabmap_viz)"/>
     <arg name="rviz"              value="$(arg rviz)"/>
     <arg name="localization"      value="$(arg localization)"/>

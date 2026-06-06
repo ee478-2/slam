@@ -28,7 +28,8 @@ equivalents are the Claude skills `slam-bringup` / `slam-mapmon` / `slam-shutdow
 Source once, then one-word commands:
 ```bash
 source ~/catkin_ws/src/slam/scripts/slam_aliases.sh   # add to ~/.bashrc to make permanent
-slam up            # env + camera + rtabmap + apriltag
+slam up            # env + camera + wheel odom + rtabmap + apriltag
+slam wheel         # command-integrated /wheel/odom only
 slam teleop        # drive
 slam rviz          # viewer on :1   (slam rviz yolo for the YOLO view)
 slam check         # quick status:  nodes / landmarks / tags seen
@@ -36,8 +37,8 @@ slam mon           # 15s map+VO monitor
 slam down          # SIGINT teardown (camera stopped last)
 slam help          # full list
 ```
-Individual steps: `slam env | cam | rtab | tags | yolo`. Override the Pi IP / GUI
-display with `SLAM_PI=...`, `SLAM_DISPLAY=:0` before sourcing.
+Individual steps: `slam env | cam | wheel | rtab | tags | yolo`. Override the Pi
+IP / GUI display with `SLAM_PI=...`, `SLAM_DISPLAY=:0` before sourcing.
 
 The rest of this file is the long form of exactly what those shortcuts run.
 
@@ -101,6 +102,27 @@ setsid roslaunch slam rtabmap_realsense.launch rviz:=false rtabmap_viz:=false \
 rosparam get /rtabmap/rgbd_odometry/Odom/ResetCountdown   # 1
 grep 'Odom: quality' /tmp/rtabmap.log | tail -1           # quality ~200-480, not 0
 ```
+
+### 2b. Wheel odometry topic
+
+```bash
+setsid roslaunch slam wheel_odom.launch > /tmp/wheel_odom.log 2>&1 &
+rostopic echo -n1 /wheel/odom
+```
+
+- Publishes `nav_msgs/Odometry` on `/wheel/odom`, frame `wheel_odom`,
+  child `base_link`, by integrating `/chassis_control/set_velocity`.
+- This is **open-loop command odometry**, not encoder feedback. The stock Pi
+  chassis node exposes commands but no wheel tick topic.
+- `linear_scale` converts the Hiwonder velocity field to m/s; default `0.01`
+  means `velocity=40` integrates as `0.40 m/s`. Calibrate it with a measured
+  straight drive before trusting distances.
+- TF is off by default (`publish_tf:=false`) to avoid conflicting with RTAB-Map's
+  live `odom->base_link` TF. For isolated tests only:
+  `roslaunch slam wheel_odom.launch publish_tf:=true`.
+- `rtabmap_realsense.launch` now passes through `odom_guess_frame_id`,
+  `odom_guess_min_translation`, and `odom_guess_min_rotation` for future motion
+  prior experiments; defaults leave RTAB-Map behavior unchanged.
 
 ---
 

@@ -1,7 +1,7 @@
 # slam_aliases.sh — short commands for the perception/SLAM stack.
 #
 #   source ~/catkin_ws/src/slam/scripts/slam_aliases.sh
-#   slam up        # env + camera + rtabmap + apriltag
+#   slam up        # env + camera + wheel odom + rtabmap + apriltag
 #   slam help      # list everything
 #
 # Add the source line to ~/.bashrc to get it in every shell.
@@ -32,8 +32,23 @@ slam() {
         depth_width:=640 depth_height:=480 depth_fps:=15 >/tmp/rs_camera.log 2>&1 &
       echo "camera (USB2 640x480@15 + pointcloud) -> /tmp/rs_camera.log" ;;
 
-    rtab)  setsid roslaunch slam rtabmap_realsense.launch rviz:=false rtabmap_viz:=false \
-             >/tmp/rtabmap.log 2>&1 & echo "rtabmap -> /tmp/rtabmap.log" ;;
+    rtab)  local guess="${SLAM_ODOM_GUESS_FRAME:-}"
+           setsid roslaunch slam rtabmap_realsense.launch rviz:=false rtabmap_viz:=false \
+             odom_guess_frame_id:="$guess" >/tmp/rtabmap.log 2>&1 &
+           if [ -n "$guess" ]; then
+             echo "rtabmap (odom guess=$guess) -> /tmp/rtabmap.log"
+           else
+             echo "rtabmap -> /tmp/rtabmap.log"
+           fi ;;
+
+    wheel|wheel-odom|wheel_odom)
+           setsid roslaunch slam wheel_odom.launch >/tmp/wheel_odom.log 2>&1 & \
+             echo "wheel odom (/wheel/odom, no TF) -> /tmp/wheel_odom.log" ;;
+
+    wheel-tf|wheel_tf)
+           setsid roslaunch slam wheel_odom.launch publish_tf:=true \
+             >/tmp/wheel_odom.log 2>&1 & \
+             echo "wheel odom (/wheel/odom + TF; use carefully with RTAB TF) -> /tmp/wheel_odom.log" ;;
 
     tags)  setsid roslaunch slam apriltag_realsense.launch >/tmp/apriltag.log 2>&1 & \
              echo "apriltag -> /tmp/apriltag.log" ;;
@@ -70,8 +85,8 @@ slam() {
              timeout 2 rostopic echo -n1 /camera/depth/color/points/header >/dev/null 2>&1 && { echo "pointcloud streaming"; break; }
              sleep 1; done
            timeout 2 rostopic echo -n1 /camera/depth/color/points/header >/dev/null 2>&1 || { echo "pointcloud did not stream; tail /tmp/rs_camera.log"; tail -n 80 /tmp/rs_camera.log; return 1; }
-           slam rtab; slam tags; slam loc
-           echo "stack up (camera+rtabmap+apriltag+localization). /odom + /robot_pose"
+           slam wheel; slam rtab; slam tags; slam loc
+           echo "stack up (camera+wheel odom+rtabmap+apriltag+localization). /wheel/odom + /odom + /robot_pose"
            echo "  appear once rtabmap odom (or a tag) is flowing — check: rostopic hz /odom"
            echo "NOTE: RViz is SEPARATE -> 'slam rviz' (on :1), or run rviz on your PC." ;;
 
@@ -119,6 +134,7 @@ PY
     down)  # SIGINT-only for the camera; consumers first
       pkill -INT -f 'rtabmap_viz/rtabmap_viz' 2>/dev/null
       pkill -INT -f 'roslaunch slam localization_manager' 2>/dev/null
+      pkill -INT -f 'roslaunch slam wheel_odom' 2>/dev/null
       pkill -INT -f 'roslaunch slam apriltag_realsense' 2>/dev/null
       pkill -INT -f 'roslaunch slam rtabmap_realsense' 2>/dev/null
       pkill -f 'object_detection.py' 2>/dev/null
@@ -133,8 +149,10 @@ PY
     help|*) cat <<EOF
 slam <cmd>:
   env           source workspace + set ROS master/IP
-  up            env + cam + rtab + tags + loc  (full perception bring-up)
+  up            env + cam + wheel + rtab + tags + loc  (full perception bring-up)
   cam           RealSense camera (USB2 recipe)
+  wheel         /wheel/odom from chassis commands (no TF by default)
+  wheel-tf      /wheel/odom plus wheel_odom->base_link TF (isolated tests)
   rtab          rtabmap RGB-D SLAM
   tags          apriltag detection (+ rtabmap landmarks)
   loc           localization_manager -> /robot_pose + /odom
