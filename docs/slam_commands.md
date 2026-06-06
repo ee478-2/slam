@@ -32,6 +32,7 @@ slam up            # env + camera + wheel odom + rtabmap + apriltag
 slam wheel         # command-integrated /wheel/odom only
 slam teleop        # drive
 slam rviz          # viewer on :1   (slam rviz yolo for the YOLO view)
+slam odom-viz      # RTAB odom path in green, wheel odom path in red
 slam check         # quick status:  nodes / landmarks / tags seen
 slam mon           # 15s map+VO monitor
 slam down          # SIGINT teardown (camera stopped last)
@@ -194,6 +195,8 @@ DISPLAY=:1 setsid rviz -d ~/catkin_ws/src/slam/rviz/apriltag_rtabmap.rviz > /tmp
 DISPLAY=:1 setsid rviz -d ~/catkin_ws/src/slam/rviz/yolo.rviz > /tmp/rviz.log 2>&1 &
 # Total mission view: global stores/signboards + status + rtabmap + tags + grasp:
 slam mission
+# RTAB visual odom vs command wheel odom, no AprilTag displays:
+slam odom-viz
 # rtabmap's own viewer (shows landmarks in the graph):
 DISPLAY=:1 ROS_NAMESPACE=rtabmap setsid rosrun rtabmap_viz rtabmap_viz _frame_id:=camera_link &
 ```
@@ -201,6 +204,13 @@ Confirm rviz is up without self-matching your command:
 ```bash
 ps -eo pid,comm | awk '$2=="rviz"{print "rviz pid="$1}'
 ```
+
+The odom comparison view runs `launch/rtab_wheel_viz.launch`, which republishes
+RTAB-Map's `/rtabmap/mapPath` plus `/rtabmap/odom` to `/odom_compare/rtab_*`
+and `/wheel/odom` to `/odom_compare/wheel_*` in a synthetic `odom_compare`
+frame. It assumes the RTAB and wheel odom origins are comparable, so start it
+with the stack for the cleanest drift check; it is not a TF fusion result.
+RTAB-Map is drawn green; wheel odom is drawn red.
 
 ---
 

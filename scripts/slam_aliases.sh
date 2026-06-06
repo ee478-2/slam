@@ -67,6 +67,11 @@ slam() {
       DISPLAY="$SLAM_DISPLAY" setsid rviz -d "$SLAM_WS/src/slam/rviz/$cfg.rviz" \
         >/tmp/rviz.log 2>&1 & echo "rviz [$cfg] on $SLAM_DISPLAY" ;;
 
+    odom-viz|odom_viz|wheel-viz|wheel_viz)
+      DISPLAY="$SLAM_DISPLAY" setsid roslaunch slam rtab_wheel_viz.launch \
+        >/tmp/rtab_wheel_viz.log 2>&1 & \
+        echo "rtab/wheel odom RViz -> /tmp/rtab_wheel_viz.log" ;;
+
     mission) slam env
       DISPLAY="$SLAM_DISPLAY" setsid roslaunch slam mission_viz.launch \
         >/tmp/mission_viz.log 2>&1 & echo "mission viz -> /tmp/mission_viz.log" ;;
@@ -133,6 +138,7 @@ PY
 
     down)  # SIGINT-only for the camera; consumers first
       pkill -INT -f 'rtabmap_viz/rtabmap_viz' 2>/dev/null
+      pkill -INT -f 'roslaunch slam rtab_wheel_viz' 2>/dev/null
       pkill -INT -f 'roslaunch slam localization_manager' 2>/dev/null
       pkill -INT -f 'roslaunch slam wheel_odom' 2>/dev/null
       pkill -INT -f 'roslaunch slam apriltag_realsense' 2>/dev/null
@@ -159,6 +165,7 @@ slam <cmd>:
   yolo          YOLO object detection
   teleop        keyboard teleop (foreground)
   rviz [name]   rviz on $SLAM_DISPLAY (default apriltag_rtabmap; or: slam rviz yolo)
+  odom-viz      RViz compare: RTAB green, wheel odom red (no AprilTag displays)
   mission       mission marker publisher + RViz total mission view on $SLAM_DISPLAY
   mission-pub   mission marker publisher only (use this for laptop RViz)
   mon           monitor map / loop-closure / VO for 15s

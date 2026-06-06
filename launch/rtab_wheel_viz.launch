@@ -1,0 +1,26 @@
+<?xml version="1.0"?>
+<!--
+  Compare existing RTAB-Map visual odometry against /wheel/odom in RViz.
+  This does not launch AprilTag detection or display AprilTag landmark topics.
+-->
+<launch>
+  <arg name="run_rviz" default="true"/>
+  <arg name="common_frame" default="odom_compare"/>
+  <arg name="rtab_odom_topic" default="/rtabmap/odom"/>
+  <arg name="rtab_path_topic" default="/rtabmap/mapPath"/>
+  <arg name="wheel_odom_topic" default="/wheel/odom"/>
+  <arg name="max_poses" default="5000"/>
+
+  <node pkg="slam" type="odom_compare_viz.py"
+        name="odom_compare_viz" output="screen">
+    <param name="common_frame" value="$(arg common_frame)"/>
+    <param name="rtab_odom_topic" value="$(arg rtab_odom_topic)"/>
+    <param name="rtab_path_topic" value="$(arg rtab_path_topic)"/>
+    <param name="wheel_odom_topic" value="$(arg wheel_odom_topic)"/>
+    <param name="max_poses" value="$(arg max_poses)"/>
+  </node>
+
+  <node if="$(arg run_rviz)" pkg="rviz" type="rviz"
+        name="rtab_wheel_rviz"
+        args="-d $(find slam)/rviz/rtab_wheel_odom.rviz"/>
+</launch>
