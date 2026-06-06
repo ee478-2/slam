@@ -16,10 +16,12 @@ transform local RTAB data into the fixed room/global coordinate frame.
 import json
 import math
 import os
+import threading
 
 import rospy
 import tf2_ros
 import yaml
+from apriltag_ros.msg import AprilTagDetectionArray
 from geometry_msgs.msg import PoseStamped, TransformStamped
 from std_msgs.msg import String
 
@@ -139,6 +141,12 @@ def transform_from_msg(msg):
     return Transform((tr.x, tr.y, tr.z), (rot.x, rot.y, rot.z, rot.w))
 
 
+def transform_from_pose(pose):
+    p = pose.position
+    q = pose.orientation
+    return Transform((p.x, p.y, p.z), (q.x, q.y, q.z, q.w))
+
+
 def transform_to_msg(tf, stamp, parent_frame, child_frame):
     msg = TransformStamped()
     msg.header.stamp = stamp
@@ -187,6 +195,9 @@ class AprilTagGlobalLocalizer:
         self.global_frame = rospy.get_param("~global_frame", "global_map")
         self.rtabmap_frame = rospy.get_param("~rtabmap_frame", "map")
         self.base_frame = rospy.get_param("~base_frame", "base_link")
+        self.tag_detections_topic = rospy.get_param(
+            "~tag_detections_topic", "/tag_detections"
+        )
         self.publish_hz = float(rospy.get_param("~publish_hz", 20.0))
         self.lookup_timeout_s = float(rospy.get_param("~lookup_timeout_s", 0.02))
         self.max_tag_age_s = float(rospy.get_param("~max_tag_age_s", 0.5))
@@ -200,10 +211,14 @@ class AprilTagGlobalLocalizer:
         if self.global_frame == self.rtabmap_frame:
             raise rospy.ROSException("global_frame and rtabmap_frame must be different")
 
-        self.known_tags = self.load_known_signboards(self.global_map_yaml)
+        self.known_tags, self.tag_to_signboard = self.load_known_signboards(
+            self.global_map_yaml
+        )
         self.tf_buffer = tf2_ros.Buffer(cache_time=rospy.Duration(10.0))
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer)
         self.tf_broadcaster = tf2_ros.TransformBroadcaster()
+        self._lock = threading.Lock()
+        self._latest_detections = []
 
         self.transform_pub = rospy.Publisher(
             "/global_localization/transform", TransformStamped, queue_size=5
@@ -218,10 +233,16 @@ class AprilTagGlobalLocalizer:
         self.last_global_from_rtab = None
         self.last_selected = None
 
+        rospy.Subscriber(
+            self.tag_detections_topic, AprilTagDetectionArray, self.on_tag_detections,
+            queue_size=10,
+        )
+
         rospy.loginfo(
-            "[apriltag_global_localizer] loaded %d signboard poses from %s; publishing %s -> %s planar=%s",
-            len(self.known_tags), self.global_map_yaml, self.global_frame,
-            self.rtabmap_frame, self.constrain_to_planar,
+            "[apriltag_global_localizer] loaded %d signboards / %d tag ids from %s; detections=%s; publishing %s -> %s planar=%s",
+            len(self.known_tags), len(self.tag_to_signboard), self.global_map_yaml,
+            self.tag_detections_topic, self.global_frame, self.rtabmap_frame,
+            self.constrain_to_planar,
         )
 
     def load_known_signboards(self, path):
@@ -234,6 +255,7 @@ class AprilTagGlobalLocalizer:
             else (0.0, 0.0, 0.0, 1.0)
         )
         known = {}
+        tag_to_signboard = {}
         for name, item in (data.get("signboards") or {}).items():
             pose = item.get("pose") or {}
             try:
@@ -246,10 +268,65 @@ class AprilTagGlobalLocalizer:
                 continue
             q = quat_multiply(yaw_quat(yaw), correction)
             known[str(name)] = Transform((x, y, z), q)
+            for tag in item.get("tags", []):
+                try:
+                    tag_to_signboard[int(tag["id"])] = str(name)
+                except (KeyError, TypeError, ValueError):
+                    rospy.logwarn(
+                        "[apriltag_global_localizer] skip invalid tag id under %s",
+                        name,
+                    )
 
         if not known:
             raise rospy.ROSException("No signboard poses loaded from %s" % path)
-        return known
+        if not tag_to_signboard:
+            raise rospy.ROSException("No signboard tag ids loaded from %s" % path)
+        return known, tag_to_signboard
+
+    def detection_signboard_id(self, tag_ids):
+        matches = {
+            self.tag_to_signboard[tag_id]
+            for tag_id in tag_ids
+            if tag_id in self.tag_to_signboard
+        }
+        if len(matches) != 1:
+            return None
+        return next(iter(matches))
+
+    def on_tag_detections(self, msg):
+        detections = []
+        for det in msg.detections:
+            tag_ids = [int(tag_id) for tag_id in det.id]
+            signboard_id = self.detection_signboard_id(tag_ids)
+            if signboard_id is None:
+                rospy.logwarn_throttle(
+                    5.0,
+                    "[apriltag_global_localizer] skip detection ids=%s; no unique signboard match",
+                    tag_ids,
+                )
+                continue
+
+            frame_id = det.pose.header.frame_id or msg.header.frame_id
+            if not frame_id:
+                rospy.logwarn_throttle(
+                    5.0,
+                    "[apriltag_global_localizer] skip %s ids=%s; detection frame is empty",
+                    signboard_id, tag_ids,
+                )
+                continue
+            stamp = det.pose.header.stamp
+            if stamp == rospy.Time(0):
+                stamp = msg.header.stamp
+            detections.append({
+                "stamp": stamp,
+                "frame_id": frame_id,
+                "signboard_id": signboard_id,
+                "tag_ids": tag_ids,
+                "camera_from_detection": transform_from_pose(det.pose.pose.pose),
+            })
+
+        with self._lock:
+            self._latest_detections = detections
 
     def lookup_transform(self, target_frame, source_frame, timeout_s=None):
         timeout = rospy.Duration(self.lookup_timeout_s if timeout_s is None else timeout_s)
@@ -273,7 +350,50 @@ class AprilTagGlobalLocalizer:
         except Exception:
             return float("inf")
 
-    def choose_visible_tag(self, now):
+    def choose_detection_anchor(self, now):
+        with self._lock:
+            detections = list(self._latest_detections)
+
+        best = None
+        for obs in detections:
+            if self.max_tag_age_s > 0.0 and obs["stamp"] != rospy.Time(0):
+                if (now - obs["stamp"]).to_sec() > self.max_tag_age_s:
+                    continue
+            try:
+                _msg, rtab_from_camera = self.lookup_transform(
+                    self.rtabmap_frame, obs["frame_id"]
+                )
+            except Exception as e:
+                rospy.logwarn_throttle(
+                    5.0,
+                    "[apriltag_global_localizer] cannot transform %s -> %s for %s: %s",
+                    self.rtabmap_frame, obs["frame_id"], obs["signboard_id"], e,
+                )
+                continue
+
+            rtab_from_detection = compose(
+                rtab_from_camera, obs["camera_from_detection"]
+            )
+            dist = self.distance_to_tag(obs["signboard_id"])
+            if not math.isfinite(dist):
+                dist = math.sqrt(sum(v * v for v in obs["camera_from_detection"].t))
+            if dist > self.max_tag_distance_m:
+                continue
+
+            global_from_detection = self.known_tags[obs["signboard_id"]]
+            candidate = (
+                dist,
+                obs["signboard_id"],
+                global_from_detection,
+                rtab_from_detection,
+                "detection",
+                obs["tag_ids"],
+            )
+            if best is None or candidate[0] < best[0]:
+                best = candidate
+        return best
+
+    def choose_tf_anchor(self, now):
         best = None
         for tag_name, global_from_tag in self.known_tags.items():
             try:
@@ -287,10 +407,16 @@ class AprilTagGlobalLocalizer:
                 dist = math.sqrt(sum(v * v for v in rtab_from_tag.t))
             if dist > self.max_tag_distance_m:
                 continue
-            candidate = (dist, tag_name, global_from_tag, rtab_from_tag)
+            candidate = (dist, tag_name, global_from_tag, rtab_from_tag, "tf", [])
             if best is None or candidate[0] < best[0]:
                 best = candidate
         return best
+
+    def choose_visible_anchor(self, now):
+        detection_anchor = self.choose_detection_anchor(now)
+        if detection_anchor is not None:
+            return detection_anchor
+        return self.choose_tf_anchor(now)
 
     def publish_robot_pose(self, global_from_rtab, stamp):
         try:
@@ -314,9 +440,9 @@ class AprilTagGlobalLocalizer:
         rate = rospy.Rate(self.publish_hz)
         while not rospy.is_shutdown():
             now = rospy.Time.now()
-            selected = self.choose_visible_tag(now)
+            selected = self.choose_visible_anchor(now)
             if selected is not None:
-                dist, tag_name, global_from_tag, rtab_from_tag = selected
+                dist, tag_name, global_from_tag, rtab_from_tag, method, tag_ids = selected
                 global_from_rtab = compose(global_from_tag, inverse_tf(rtab_from_tag))
                 if self.constrain_to_planar:
                     global_from_rtab = planarize_transform(global_from_rtab)
@@ -327,13 +453,15 @@ class AprilTagGlobalLocalizer:
                     "tag": tag_name,
                     "distance_m": round(dist, 4),
                     "global_frame": self.global_frame,
+                    "method": method,
                     "rtabmap_frame": self.rtabmap_frame,
                     "planar": self.constrain_to_planar,
+                    "tag_ids": tag_ids,
                 }, sort_keys=True)))
                 rospy.loginfo_throttle(
                     3.0,
-                    "[apriltag_global_localizer] anchored %s -> %s using %s at %.2fm",
-                    self.global_frame, self.rtabmap_frame, tag_name, dist,
+                    "[apriltag_global_localizer] anchored %s -> %s using %s match=%s ids=%s at %.2fm",
+                    self.global_frame, self.rtabmap_frame, method, tag_name, tag_ids, dist,
                 )
             elif self.hold_last_transform and self.last_global_from_rtab is not None:
                 self.publish_anchor(self.last_global_from_rtab, now)

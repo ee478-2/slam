@@ -16,6 +16,7 @@
   <arg name="global_frame" default="global_map"/>
   <arg name="rtabmap_frame" default="map"/>
   <arg name="base_frame" default="base_link"/>
+  <arg name="tag_detections_topic" default="/tag_detections"/>
   <arg name="publish_hz" default="20.0"/>
   <arg name="lookup_timeout_s" default="0.02"/>
   <arg name="max_tag_age_s" default="0.5"/>
@@ -30,6 +31,7 @@
     <param name="global_frame" value="$(arg global_frame)"/>
     <param name="rtabmap_frame" value="$(arg rtabmap_frame)"/>
     <param name="base_frame" value="$(arg base_frame)"/>
+    <param name="tag_detections_topic" value="$(arg tag_detections_topic)"/>
     <param name="publish_hz" value="$(arg publish_hz)"/>
     <param name="lookup_timeout_s" value="$(arg lookup_timeout_s)"/>
     <param name="max_tag_age_s" value="$(arg max_tag_age_s)"/>
