@@ -322,11 +322,9 @@ class MissionVizPublisher:
                     )
                 )
 
-            label = "{}\n{}\n({:.2f}, {:.2f})".format(
+            label = "{}\n{}".format(
                 store["id"],
                 store["category"],
-                store["x"],
-                store["y"],
             )
             inventory = STORE_INVENTORY.get(store["category"], [])
             if inventory:
@@ -363,11 +361,7 @@ class MissionVizPublisher:
             self.set_color(marker, (1.0, 0.86, 0.16, 0.96))
             markers.append(marker)
 
-            label = "{}\n({:.2f}, {:.2f})".format(
-                signboard["id"],
-                signboard["x"],
-                signboard["y"],
-            )
+            label = signboard["id"]
             if self.show_signboard_details:
                 tag_text = []
                 for tag in signboard["tags"]:
@@ -452,10 +446,7 @@ class MissionVizPublisher:
                 self.robot_pose["x"],
                 self.robot_pose["y"],
                 0.70,
-                "robot\n({:.2f}, {:.2f})".format(
-                    self.robot_pose["x"],
-                    self.robot_pose["y"],
-                ),
+                "robot",
                 0.11,
                 (0.45, 0.75, 1.0, 1.0),
             ),
