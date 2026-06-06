@@ -68,6 +68,7 @@ target_link_libraries(apriltag_localization_node ${catkin_LIBRARIES} yaml-cpp)
 
 catkin_install_python(PROGRAMS
   localization_manager/scripts/localization_manager_node.py
+  scripts/mission_viz_publisher.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
@@ -83,6 +84,7 @@ install(DIRECTORY
   AprilTagLocalization/launch
   AprilTagLocalization/rviz
   config
+  launch
   localization_manager/config
   localization_manager/launch
   my_rtabmap/launch

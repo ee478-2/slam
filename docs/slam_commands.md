@@ -170,6 +170,8 @@ that restarts rtabmap and wipes the map):
 DISPLAY=:1 setsid rviz -d ~/catkin_ws/src/slam/rviz/apriltag_rtabmap.rviz > /tmp/rviz.log 2>&1 &
 # YOLO debug image:
 DISPLAY=:1 setsid rviz -d ~/catkin_ws/src/slam/rviz/yolo.rviz > /tmp/rviz.log 2>&1 &
+# Total mission view: global stores/signboards + status + rtabmap + tags + grasp:
+DISPLAY=:1 setsid roslaunch slam mission_viz.launch > /tmp/mission_viz.log 2>&1 &
 # rtabmap's own viewer (shows landmarks in the graph):
 DISPLAY=:1 ROS_NAMESPACE=rtabmap setsid rosrun rtabmap_viz rtabmap_viz _frame_id:=camera_link &
 ```
@@ -209,9 +211,22 @@ Get the config + launch:
 scp ee478_team2@192.168.0.101:~/catkin_ws/src/slam/rviz/apriltag_rtabmap.rviz /tmp/
 rviz -d /tmp/apriltag_rtabmap.rviz                    # Fixed Frame = map
 ```
+For the **total mission view**, first run the marker publisher on the Jetson,
+then run RViz on your PC:
+```bash
+# on Jetson
+roslaunch slam mission_viz.launch run_rviz:=false
+
+# on your PC
+scp ee478_team2@192.168.0.101:~/catkin_ws/src/slam/rviz/mission.rviz /tmp/
+rviz -d /tmp/mission.rviz
+```
 Notes:
 - `/rtabmap/cloud_map` is the full growing cloud — heavy over **WiFi**. If laggy,
   uncheck the PointCloud2 display; landmarks + path + tag image stay light.
+- The mission map markers are published on `/mission/markers` from
+  `config/global_map.yaml`. The status panel listens for `/shopping_list`,
+  `/grabbed_items`, `/inventory`, and `/visited_stores` if those are available.
 - Optional `sudo apt install ros-noetic-rtabmap-ros` only if you want rtabmap's
   own RViz plugins / `mapData` display — not needed for `apriltag_rtabmap.rviz`.
 - Nothing runs on the Jetson `:1` for this; it's purely your machine.

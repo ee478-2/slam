@@ -52,6 +52,9 @@ slam() {
       DISPLAY="$SLAM_DISPLAY" setsid rviz -d "$SLAM_WS/src/slam/rviz/$cfg.rviz" \
         >/tmp/rviz.log 2>&1 & echo "rviz [$cfg] on $SLAM_DISPLAY" ;;
 
+    mission) DISPLAY="$SLAM_DISPLAY" setsid roslaunch slam mission_viz.launch \
+        >/tmp/mission_viz.log 2>&1 & echo "mission viz -> /tmp/mission_viz.log" ;;
+
     up)    slam env; slam cam
            echo "...waiting for camera to actually stream"
            local i; for i in $(seq 1 20); do
@@ -133,6 +136,7 @@ slam <cmd>:
   yolo          YOLO object detection
   teleop        keyboard teleop (foreground)
   rviz [name]   rviz on $SLAM_DISPLAY (default apriltag_rtabmap; or: slam rviz yolo)
+  mission       mission marker publisher + RViz total mission view
   mon           monitor map / loop-closure / VO for 15s
   check         quick status snapshot
   down          SIGINT teardown (camera stopped LAST)
