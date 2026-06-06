@@ -182,12 +182,13 @@ rosrun tf tf_echo global_map map
 
 When a known signboard bundle is visible, the node matches the detected
 `/tag_detections.id` values back to the owning `SIGNBOARDxx` in
-`config/global_map.yaml`, then publishes planar `global_map -> map` (x/y/yaw
-only) plus `/global_localization/robot_pose`. The localization manager consumes
-that pose first, so `/odom` and `/robot_pose` are in `global_map` while the
-anchor is fresh; if no tag anchor is available, they fall back to RTAB's local
-odometry frame. `/global_localization/selected_tag` reports the match method and
-the tag IDs used.
+`config/global_map.yaml`, solves the planar `global_map -> map` transform that
+places the observed RTAB tag point exactly on that signboard's global x/y point,
+and publishes `/global_localization/robot_pose`. The localization manager
+consumes that pose first, so `/odom` and `/robot_pose` are in `global_map` while
+the anchor is fresh; if no tag anchor is available, they fall back to RTAB's
+local odometry frame. `/global_localization/selected_tag` reports the match
+method, tag IDs, and `anchor_error_m`.
 
 ---
 

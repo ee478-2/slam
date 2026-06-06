@@ -2,10 +2,10 @@
 """
 Anchor RTAB-Map's local map frame to the room/global map with AprilTags.
 
-apriltag_ros publishes detected bundle frames such as SIGNBOARD05 in the live
-TF tree. RTAB-Map also publishes its local SLAM frame, normally "map". This node
-uses known signboard poses from config/global_map.yaml and the observed
-rtabmap_frame -> SIGNBOARDxx transform to publish:
+apriltag_ros publishes detected bundle IDs and poses in the camera frame.
+RTAB-Map also publishes its local SLAM frame, normally "map". This node uses
+known signboard poses from config/global_map.yaml and the observed detection
+pose in the RTAB frame to publish:
 
   global_map -> map
 
@@ -131,8 +131,34 @@ def inverse_tf(tf):
     return Transform(ti, qi)
 
 
-def planarize_transform(tf, z=0.0):
-    return Transform((tf.t[0], tf.t[1], z), yaw_quat(yaw_from_quat(tf.q)))
+def planar_anchor_transform(global_from_tag, rtab_from_tag, z=0.0):
+    # Solve the 2D alignment directly; projecting a 6-DoF tag solve can move
+    # the tag's x/y point when roll, pitch, or camera height are present.
+    yaw = yaw_from_quat(global_from_tag.q) - yaw_from_quat(rtab_from_tag.q)
+    c = math.cos(yaw)
+    s = math.sin(yaw)
+    rx, ry = rtab_from_tag.t[0], rtab_from_tag.t[1]
+    tx = global_from_tag.t[0] - (c * rx - s * ry)
+    ty = global_from_tag.t[1] - (s * rx + c * ry)
+    return Transform((tx, ty, z), yaw_quat(yaw))
+
+
+def anchor_transform(global_from_tag, rtab_from_tag, planar=True):
+    if planar:
+        return planar_anchor_transform(global_from_tag, rtab_from_tag)
+    return compose(global_from_tag, inverse_tf(rtab_from_tag))
+
+
+def planar_point_error(global_from_rtab, global_from_tag, rtab_from_tag):
+    yaw = yaw_from_quat(global_from_rtab.q)
+    c = math.cos(yaw)
+    s = math.sin(yaw)
+    rx, ry = rtab_from_tag.t[0], rtab_from_tag.t[1]
+    px = global_from_rtab.t[0] + (c * rx - s * ry)
+    py = global_from_rtab.t[1] + (s * rx + c * ry)
+    dx = px - global_from_tag.t[0]
+    dy = py - global_from_tag.t[1]
+    return math.sqrt(dx * dx + dy * dy)
 
 
 def transform_from_msg(msg):
@@ -443,13 +469,17 @@ class AprilTagGlobalLocalizer:
             selected = self.choose_visible_anchor(now)
             if selected is not None:
                 dist, tag_name, global_from_tag, rtab_from_tag, method, tag_ids = selected
-                global_from_rtab = compose(global_from_tag, inverse_tf(rtab_from_tag))
-                if self.constrain_to_planar:
-                    global_from_rtab = planarize_transform(global_from_rtab)
+                global_from_rtab = anchor_transform(
+                    global_from_tag, rtab_from_tag, self.constrain_to_planar
+                )
+                anchor_error_m = planar_point_error(
+                    global_from_rtab, global_from_tag, rtab_from_tag
+                )
                 self.last_global_from_rtab = global_from_rtab
                 self.last_selected = tag_name
                 self.publish_anchor(global_from_rtab, now)
                 self.selected_tag_pub.publish(String(json.dumps({
+                    "anchor_error_m": round(anchor_error_m, 4),
                     "tag": tag_name,
                     "distance_m": round(dist, 4),
                     "global_frame": self.global_frame,
@@ -460,8 +490,9 @@ class AprilTagGlobalLocalizer:
                 }, sort_keys=True)))
                 rospy.loginfo_throttle(
                     3.0,
-                    "[apriltag_global_localizer] anchored %s -> %s using %s match=%s ids=%s at %.2fm",
-                    self.global_frame, self.rtabmap_frame, method, tag_name, tag_ids, dist,
+                    "[apriltag_global_localizer] anchored %s -> %s using %s match=%s ids=%s at %.2fm planar_error=%.3fm",
+                    self.global_frame, self.rtabmap_frame, method, tag_name,
+                    tag_ids, dist, anchor_error_m,
                 )
             elif self.hold_last_transform and self.last_global_from_rtab is not None:
                 self.publish_anchor(self.last_global_from_rtab, now)
