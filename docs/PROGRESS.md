@@ -24,6 +24,8 @@ this file stays an index + current open items.** Newest first.
 ## Log index
 
 ### 2026-06 — real-robot `slam` → [`docs/progress/2026-06.md`](progress/2026-06.md)
+- **2026-06-06** RTAB-vs-wheel odom RViz — `de38748` · added a
+  no-AprilTag comparison view: RTAB path/pose in green, `/wheel/odom` in red.
 - **2026-06-06** `/wheel/odom` command odometry — `db5668a` · added a
   command-integrated wheel odom topic from `/chassis_control/set_velocity`;
   true encoder feedback remains Pi-side/unexposed.
