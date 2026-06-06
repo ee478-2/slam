@@ -24,6 +24,8 @@ this file stays an index + current open items.** Newest first.
 ## Log index
 
 ### 2026-06 — real-robot `slam` → [`docs/progress/2026-06.md`](progress/2026-06.md)
+- **2026-06-06** mission RViz relaunch fix — `17aa5b5` · `slam mission`
+  now runs `slam env`; new `slam mission-pub` starts `/mission/markers` only for laptop RViz.
 - **2026-06-06** mission RViz total view — `4b82198` · `/mission/markers`
   publishes global stores/signboards/status from `global_map.yaml`; `rviz/mission.rviz`
   overlays RTAB-Map trajectory, AprilTag images/landmarks, and grasp/inventory context.
