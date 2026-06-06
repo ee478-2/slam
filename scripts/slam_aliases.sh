@@ -53,6 +53,11 @@ slam() {
     tags)  setsid roslaunch slam apriltag_realsense.launch >/tmp/apriltag.log 2>&1 & \
              echo "apriltag -> /tmp/apriltag.log" ;;
 
+    global-loc|global_loc)
+           setsid roslaunch slam apriltag_global_localization.launch \
+             >/tmp/global_loc.log 2>&1 & \
+             echo "apriltag global localization (global_map->map, /global_localization/robot_pose) -> /tmp/global_loc.log" ;;
+
     loc)   # localization_manager: fuses tag/rtabmap pose -> /robot_pose + /odom
            setsid roslaunch slam localization_manager.launch >/tmp/locman.log 2>&1 & \
              echo "localization_manager (/odom + /robot_pose) -> /tmp/locman.log" ;;
@@ -97,9 +102,10 @@ slam() {
              timeout 2 rostopic echo -n1 /camera/depth/color/points/header >/dev/null 2>&1 && { echo "pointcloud streaming"; break; }
              sleep 1; done
            timeout 2 rostopic echo -n1 /camera/depth/color/points/header >/dev/null 2>&1 || { echo "pointcloud did not stream; tail /tmp/rs_camera.log"; tail -n 80 /tmp/rs_camera.log; return 1; }
-           slam wheel; slam rtab; slam tags; slam loc
-           echo "stack up (arm home+camera+wheel odom+rtabmap+apriltag+localization). /wheel/odom + /odom + /robot_pose"
-           echo "  appear once rtabmap odom (or a tag) is flowing — check: rostopic hz /odom"
+           slam wheel; slam rtab; slam tags; slam global-loc; slam loc
+           echo "stack up (arm home+camera+wheel odom+rtabmap+apriltag+global localization+localization). /wheel/odom + /odom + /robot_pose"
+           echo "  /odom is global_map when a known signboard tag anchors RTAB; otherwise it falls back to RTAB odom"
+           echo "  check: rostopic echo -n1 /global_localization/selected_tag && rostopic echo -n1 /odom/header"
            echo "NOTE: RViz is SEPARATE -> 'slam rviz' (on :1), or run rviz on your PC." ;;
 
     mon)   python3 - <<'PY'
@@ -147,6 +153,7 @@ PY
       pkill -INT -f 'rtabmap_viz/rtabmap_viz' 2>/dev/null
       pkill -INT -f 'roslaunch slam rtab_wheel_viz' 2>/dev/null
       pkill -INT -f 'roslaunch slam localization_manager' 2>/dev/null
+      pkill -INT -f 'roslaunch slam apriltag_global_localization' 2>/dev/null
       pkill -INT -f 'roslaunch slam wheel_odom' 2>/dev/null
       pkill -INT -f 'roslaunch slam apriltag_realsense' 2>/dev/null
       pkill -INT -f 'roslaunch slam rtabmap_realsense' 2>/dev/null
@@ -169,7 +176,8 @@ slam <cmd>:
   wheel-tf      /wheel/odom plus wheel_odom->base_link TF (isolated tests)
   rtab          rtabmap RGB-D SLAM
   tags          apriltag detection (+ rtabmap landmarks)
-  loc           localization_manager -> /robot_pose + /odom
+  global-loc    AprilTag anchor: publish global_map->map + global robot pose
+  loc           localization_manager -> /robot_pose + /odom (global if anchored)
   yolo          YOLO object detection
   teleop        keyboard teleop (foreground)
   rviz [name]   rviz on $SLAM_DISPLAY (default apriltag_rtabmap; or: slam rviz yolo)

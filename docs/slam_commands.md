@@ -28,8 +28,9 @@ equivalents are the Claude skills `slam-bringup` / `slam-mapmon` / `slam-shutdow
 Source once, then one-word commands:
 ```bash
 source ~/catkin_ws/src/slam/scripts/slam_aliases.sh   # add to ~/.bashrc to make permanent
-slam up            # env + arm home + camera + wheel odom + rtabmap + apriltag
+slam up            # env + arm home + camera + wheel + rtabmap + apriltag + global-loc
 slam wheel         # command-integrated /wheel/odom only
+slam global-loc    # AprilTag anchor: global_map -> RTAB map
 slam teleop        # drive
 slam rviz          # viewer on :1   (slam rviz yolo for the YOLO view)
 slam odom-viz      # RTAB odom path in green, wheel odom path in red
@@ -38,7 +39,7 @@ slam mon           # 15s map+VO monitor
 slam down          # SIGINT teardown (camera stopped last)
 slam help          # full list
 ```
-Individual steps: `slam env | arm-home | cam | wheel | rtab | tags | yolo`.
+Individual steps: `slam env | arm-home | cam | wheel | rtab | tags | global-loc | loc | yolo`.
 Override the Pi IP / GUI display with `SLAM_PI=...`, `SLAM_DISPLAY=:0` before
 sourcing.
 
@@ -146,7 +147,7 @@ rostopic echo -n1 /wheel/odom
 
 ---
 
-## 3. AprilTag detection + rtabmap landmarks
+## 3. AprilTag detection + global RTAB anchoring
 
 ```bash
 setsid roslaunch slam apriltag_realsense.launch > /tmp/apriltag.log 2>&1 &
@@ -169,8 +170,21 @@ rospy.Subscriber('/rtabmap/landmarks',PoseArray,lambda m:s.__setitem__('lm',len(
 time.sleep(6); print('tags seen:',s['ids'] or 'none','| landmarks:',s['lm'])
 PY
 ```
-> NOTE: this does NOT localize against `config/global_map.yaml` — rtabmap works in
-> its own map frame. Global-frame absolute localization is not wired yet.
+
+Global anchoring is a separate node. It does not rewrite RTAB-Map's local
+`map`; it publishes a parent transform from the fixed room frame to RTAB's map:
+
+```bash
+setsid roslaunch slam apriltag_global_localization.launch > /tmp/global_loc.log 2>&1 &
+rostopic echo -n1 /global_localization/selected_tag
+rosrun tf tf_echo global_map map
+```
+
+When a known signboard bundle is visible, the node uses `config/global_map.yaml`
+to publish `global_map -> map` plus `/global_localization/robot_pose`. The
+localization manager consumes that pose first, so `/odom` and `/robot_pose` are
+in `global_map` while the anchor is fresh; if no tag anchor is available, they
+fall back to RTAB's local odometry frame.
 
 ---
 
@@ -277,8 +291,10 @@ Notes:
 - `/rtabmap/cloud_map` is the full growing cloud — heavy over **WiFi**. If laggy,
   uncheck the PointCloud2 display; landmarks + path + tag image stay light.
 - The mission map markers are published on `/mission/markers` from
-  `config/global_map.yaml`. The status panel listens for `/shopping_list`,
-  `/grabbed_items`, `/inventory`, and `/visited_stores` if those are available.
+  `config/global_map.yaml` in frame `global_map`. RTAB path/cloud topics are
+  transformed through `global_map -> map` once `slam global-loc` sees a known
+  signboard tag. The status panel listens for `/shopping_list`, `/grabbed_items`,
+  `/inventory`, and `/visited_stores` if those are available.
 - Optional `sudo apt install ros-noetic-rtabmap-ros` only if you want rtabmap's
   own RViz plugins / `mapData` display — not needed for `apriltag_rtabmap.rviz`.
 - Nothing runs on the Jetson `:1` for this; it's purely your machine.

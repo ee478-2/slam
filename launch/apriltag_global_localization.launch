@@ -1,0 +1,40 @@
+<?xml version="1.0"?>
+<!--
+  Publish global_map -> RTAB local map using visible AprilTag signboards.
+
+  Inputs:
+    - /tf from RTAB-Map and apriltag_ros bundle detections
+    - config/global_map.yaml signboard poses
+
+  Outputs:
+    - TF: global_frame -> rtabmap_frame
+    - /global_localization/robot_pose in global_frame
+    - /global_localization/selected_tag diagnostic JSON
+-->
+<launch>
+  <arg name="global_map_yaml" default="$(find slam)/config/global_map.yaml"/>
+  <arg name="global_frame" default="global_map"/>
+  <arg name="rtabmap_frame" default="map"/>
+  <arg name="base_frame" default="base_link"/>
+  <arg name="publish_hz" default="20.0"/>
+  <arg name="lookup_timeout_s" default="0.02"/>
+  <arg name="max_tag_age_s" default="0.5"/>
+  <arg name="max_tag_distance_m" default="2.0"/>
+  <arg name="hold_last_transform" default="true"/>
+  <arg name="apply_legacy_orientation_correction" default="true"/>
+
+  <node pkg="slam" type="apriltag_global_localizer.py"
+        name="apriltag_global_localizer" output="screen">
+    <param name="global_map_yaml" value="$(arg global_map_yaml)"/>
+    <param name="global_frame" value="$(arg global_frame)"/>
+    <param name="rtabmap_frame" value="$(arg rtabmap_frame)"/>
+    <param name="base_frame" value="$(arg base_frame)"/>
+    <param name="publish_hz" value="$(arg publish_hz)"/>
+    <param name="lookup_timeout_s" value="$(arg lookup_timeout_s)"/>
+    <param name="max_tag_age_s" value="$(arg max_tag_age_s)"/>
+    <param name="max_tag_distance_m" value="$(arg max_tag_distance_m)"/>
+    <param name="hold_last_transform" type="bool" value="$(arg hold_last_transform)"/>
+    <param name="apply_legacy_orientation_correction" type="bool"
+           value="$(arg apply_legacy_orientation_correction)"/>
+  </node>
+</launch>

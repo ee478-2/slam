@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <launch>
   <arg name="global_map_yaml" default="$(find slam)/config/global_map.yaml"/>
-  <arg name="frame_id" default="map"/>
+  <arg name="frame_id" default="global_map"/>
   <arg name="marker_topic" default="/mission/markers"/>
   <arg name="marker_hz" default="1.0"/>
   <arg name="show_signboard_details" default="true"/>

@@ -2,17 +2,19 @@
 <!--
   localization_manager.launch — publishes /robot_pose at publish_hz Hz.
 
-  pose_source: auto | sim_gt | tag | rtabmap
-    auto    — tag (if fresh) > sim_gt > rtabmap
-    sim_gt  — only /gazebo/model_states (simulation-only)
-    tag     — only /apriltag_localization_pose
-    rtabmap — only /rtabmap/odom
+  pose_source: auto | global_tag | sim_gt | tag | rtabmap
+    auto       — global_tag (if fresh) > tag (if fresh) > sim_gt > rtabmap
+    global_tag — only /global_localization/robot_pose
+    sim_gt     — only /gazebo/model_states (simulation-only)
+    tag        — only /apriltag_localization_pose
+    rtabmap    — only /rtabmap/odom
 -->
 <launch>
   <arg name="pose_source"       default="auto"/>
   <arg name="world_frame_name"  default="map"/>
   <arg name="robot_model_name"  default="nexus_4wd_mecanum"/>
   <arg name="tag_freshness_s"   default="1.0"/>
+  <arg name="global_freshness_s" default="1.0"/>
   <arg name="publish_hz"        default="20.0"/>
 
   <node pkg="slam" type="localization_manager_node.py"
@@ -21,6 +23,7 @@
     <param name="world_frame_name" value="$(arg world_frame_name)"/>
     <param name="robot_model_name" value="$(arg robot_model_name)"/>
     <param name="tag_freshness_s"  value="$(arg tag_freshness_s)"/>
+    <param name="global_freshness_s" value="$(arg global_freshness_s)"/>
     <param name="publish_hz"       value="$(arg publish_hz)"/>
   </node>
 </launch>
