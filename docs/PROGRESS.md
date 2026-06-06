@@ -10,7 +10,7 @@ this file stays an index + current open items.** Newest first.
 ## Active / Open (real robot, `slam` package)
 
 - **`go_to_goal_avoid` tuning** — in-place yaw "wari-gari" oscillation on hardware; an
-  oscillation fix was tried then reverted. Still being tuned (edits uncommitted in tree).
+  oscillation fix was tried then reverted. Still being tuned.
 - **"go to store_N" — step 2** = AprilTag *global* localization: rtabmap's map frame ≠
   `config/global_map.yaml` room frame, so absolute/global localization is not wired yet.
 - **Loop closure via tag re-observation** — not yet captured (drive back to a seen tag).
@@ -24,6 +24,9 @@ this file stays an index + current open items.** Newest first.
 ## Log index
 
 ### 2026-06 — real-robot `slam` → [`docs/progress/2026-06.md`](progress/2026-06.md)
+- **2026-06-06** mission RViz total view — `4b82198` · `/mission/markers`
+  publishes global stores/signboards/status from `global_map.yaml`; `rviz/mission.rviz`
+  overlays RTAB-Map trajectory, AprilTag images/landmarks, and grasp/inventory context.
 - **2026-06-04** remove local_costmap_generator component — `6037cf8` · deleted the
   dormant heightmap node/nodelet (never in `slam up`); obstacle cloud + local costmap
   come from sibling `local_planner`, so no functional change. Pruned `pluginlib` dep.
