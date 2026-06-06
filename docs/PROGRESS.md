@@ -25,6 +25,8 @@ this file stays an index + current open items.** Newest first.
 ## Log index
 
 ### 2026-06 — real-robot `slam` → [`docs/progress/2026-06.md`](progress/2026-06.md)
+- **2026-06-06** planar AprilTag anchor solve — `1fb2d38` · computes
+  `global_map -> map` directly in x/y/yaw so the detected tag point lands on the configured signboard.
 - **2026-06-06** detected-tag ID global anchor matching — `70c5fa5` · anchors
   from `/tag_detections.id -> SIGNBOARDxx` instead of relying on signboard TF names.
 - **2026-06-06** planar AprilTag global anchor — `77f69de` · constrained
