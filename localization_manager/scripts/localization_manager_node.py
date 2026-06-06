@@ -13,10 +13,12 @@ A `pose_source` ROS param selects which source to publish:
   - "tag"     — only /apriltag_localization_pose
   - "rtabmap" — only /rtabmap/odom
 
-The output is always geometry_msgs/PoseStamped on /robot_pose with
-frame_id = world_frame_name (default "map"), published at publish_hz Hz. The
-same fused pose is ALSO published as nav_msgs/Odometry on /odom (header
-frame_id = world_frame_name, child_frame_id = base_frame_name) so the real-robot
+The output is geometry_msgs/PoseStamped on /robot_pose, published at
+publish_hz Hz, using the selected source's frame. Simulation and AprilTag poses
+are normally in world_frame_name (default "map"). RTAB-Map odometry is local
+odom and must stay in its own odom frame; relabeling it as "map" makes /odom
+and the TF base_link disagree in RViz. The same fused pose is ALSO published as
+nav_msgs/Odometry on /odom (child_frame_id = base_frame_name) so the real-robot
 nav stack gets an /odom even though the chassis publishes none. Twist is left
 zero (this is a pose-only odom).
 
@@ -64,8 +66,9 @@ class LocalizationManager:
                          self._on_rtab_odom, queue_size=10)
 
         rospy.loginfo(
-            "[localization_manager] pose_source=%s  world_frame=%s  publish_hz=%.1f  tag_freshness_s=%.1f",
-            self.pose_source, self.world_frame_name, self.publish_hz, self.tag_freshness_s,
+            "[localization_manager] pose_source=%s  world_frame=%s  base_frame=%s  publish_hz=%.1f  tag_freshness_s=%.1f",
+            self.pose_source, self.world_frame_name, self.base_frame_name,
+            self.publish_hz, self.tag_freshness_s,
         )
 
     # ---------- callbacks ----------
@@ -127,10 +130,14 @@ class LocalizationManager:
         while not rospy.is_shutdown():
             ps, src = self._pick()
             if ps is not None:
-                # Re-stamp so downstream consumers see a fresh time.
+                source_frame = ps.header.frame_id or self.world_frame_name
+
+                # Re-stamp so downstream consumers see a fresh time. Keep the
+                # source frame truthful; /rtabmap/odom is an odom-frame pose,
+                # not a map-frame pose.
                 out = PoseStamped()
                 out.header.stamp = rospy.Time.now()
-                out.header.frame_id = self.world_frame_name
+                out.header.frame_id = source_frame
                 out.pose = ps.pose
                 self.pub.publish(out)
 
@@ -138,13 +145,16 @@ class LocalizationManager:
                 # (sim had /odom; the real chassis publishes none). Twist = zero.
                 odom = Odometry()
                 odom.header.stamp = out.header.stamp
-                odom.header.frame_id = self.world_frame_name
+                odom.header.frame_id = source_frame
                 odom.child_frame_id = self.base_frame_name
                 odom.pose.pose = ps.pose
                 self.odom_pub.publish(odom)
 
                 if src != last_logged_source:
-                    rospy.loginfo("[localization_manager] active source: %s", src)
+                    rospy.loginfo(
+                        "[localization_manager] active source: %s frame=%s",
+                        src, source_frame,
+                    )
                     last_logged_source = src
             rate.sleep()
 
