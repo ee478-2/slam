@@ -11,8 +11,9 @@ this file stays an index + current open items.** Newest first.
 
 - **`go_to_goal_avoid` tuning** — in-place yaw "wari-gari" oscillation on hardware; an
   oscillation fix was tried then reverted. Still being tuned.
-- **"go to store_N" — step 2** = AprilTag *global* localization: rtabmap's map frame ≠
-  `config/global_map.yaml` room frame, so absolute/global localization is not wired yet.
+- **AprilTag global localization verification** — `a6783dd` wires
+  `global_map -> map` and global `/odom` when known signboard tags are visible;
+  needs live robot validation against real tag observations.
 - **Loop closure via tag re-observation** — not yet captured (drive back to a seen tag).
 - **Wheel odometry calibration / true encoders** — `/wheel/odom` now exists as
   command-integrated odom; chassis still publishes no encoder/tick feedback.
@@ -24,6 +25,8 @@ this file stays an index + current open items.** Newest first.
 ## Log index
 
 ### 2026-06 — real-robot `slam` → [`docs/progress/2026-06.md`](progress/2026-06.md)
+- **2026-06-06** AprilTag global RTAB anchor + `/odom` — `a6783dd` · added
+  `global_map -> map` from known signboard tags and made `/odom` global when anchored.
 - **2026-06-06** localization `/odom` frame fix — `e801a98` · preserved
   RTAB-Map's source odom frame instead of relabeling local odom as `map`.
 - **2026-06-06** arm home default pose update — `018157c` · changed the
