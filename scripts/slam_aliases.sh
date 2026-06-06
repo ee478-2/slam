@@ -1,7 +1,7 @@
 # slam_aliases.sh — short commands for the perception/SLAM stack.
 #
 #   source ~/catkin_ws/src/slam/scripts/slam_aliases.sh
-#   slam up        # env + camera + rtabmap + apriltag
+#   slam up        # env + camera + rtabmap + apriltag + signboard HUD
 #   slam help      # list everything
 #
 # Add the source line to ~/.bashrc to get it in every shell.
@@ -38,6 +38,14 @@ slam() {
     tags)  setsid roslaunch slam apriltag_realsense.launch >/tmp/apriltag.log 2>&1 & \
              echo "apriltag -> /tmp/apriltag.log" ;;
 
+    signs) slam env
+      setsid rosrun llm_agent signboard_recognition_node.py \
+             _global_map_yaml:="$SLAM_WS/src/slam/config/global_map.yaml" \
+             _publish_hud:=true \
+             _hud_source_topic:=/tag_detections_image \
+             _hud_fallback_topic:=/camera/color/image_raw \
+             >/tmp/signboards.log 2>&1 & echo "signboard recognition -> /tmp/signboards.log" ;;
+
     loc)   # localization_manager: fuses tag/rtabmap pose -> /robot_pose + /odom
            setsid roslaunch slam localization_manager.launch >/tmp/locman.log 2>&1 & \
              echo "localization_manager (/odom + /robot_pose) -> /tmp/locman.log" ;;
@@ -70,8 +78,8 @@ slam() {
              timeout 2 rostopic echo -n1 /camera/depth/color/points/header >/dev/null 2>&1 && { echo "pointcloud streaming"; break; }
              sleep 1; done
            timeout 2 rostopic echo -n1 /camera/depth/color/points/header >/dev/null 2>&1 || { echo "pointcloud did not stream; tail /tmp/rs_camera.log"; tail -n 80 /tmp/rs_camera.log; return 1; }
-           slam rtab; slam tags; slam loc
-           echo "stack up (camera+rtabmap+apriltag+localization). /odom + /robot_pose"
+           slam rtab; slam tags; slam loc; slam signs
+           echo "stack up (camera+rtabmap+apriltag+signboards+localization). /odom + /robot_pose"
            echo "  appear once rtabmap odom (or a tag) is flowing — check: rostopic hz /odom"
            echo "NOTE: RViz is SEPARATE -> 'slam rviz' (on :1), or run rviz on your PC." ;;
 
@@ -98,7 +106,7 @@ PY
       ;;
 
     check) echo "== running ==";
-      ps -eo pid,comm | awk '$2~/nodelet|rgbd_odometry|rtabmap|apriltag|rviz|object_dete/{print "  "$0}'
+      ps -eo pid,comm | awk '$2~/nodelet|rgbd_odometry|rtabmap|apriltag|rviz|object_dete|signboard/{print "  "$0}'
       python3 - <<'PY'
 import rospy,time
 from apriltag_ros.msg import AprilTagDetectionArray
@@ -119,6 +127,7 @@ PY
     down)  # SIGINT-only for the camera; consumers first
       pkill -INT -f 'rtabmap_viz/rtabmap_viz' 2>/dev/null
       pkill -INT -f 'roslaunch slam localization_manager' 2>/dev/null
+      pkill -INT -f 'signboard_recognition_node.py' 2>/dev/null
       pkill -INT -f 'roslaunch slam apriltag_realsense' 2>/dev/null
       pkill -INT -f 'roslaunch slam rtabmap_realsense' 2>/dev/null
       pkill -f 'object_detection.py' 2>/dev/null
@@ -133,10 +142,11 @@ PY
     help|*) cat <<EOF
 slam <cmd>:
   env           source workspace + set ROS master/IP
-  up            env + cam + rtab + tags + loc  (full perception bring-up)
+  up            env + cam + rtab + tags + signs + loc  (full perception bring-up)
   cam           RealSense camera (USB2 recipe)
   rtab          rtabmap RGB-D SLAM
   tags          apriltag detection (+ rtabmap landmarks)
+  signs         signboard semantic labels + /signboards/detections_image
   loc           localization_manager -> /robot_pose + /odom
   yolo          YOLO object detection
   teleop        keyboard teleop (foreground)
