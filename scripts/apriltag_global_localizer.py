@@ -85,6 +85,14 @@ def yaw_quat(yaw):
     return (0.0, 0.0, math.sin(yaw * 0.5), math.cos(yaw * 0.5))
 
 
+def yaw_from_quat(q):
+    x, y, z, w = normalize_quat(q)
+    return math.atan2(
+        2.0 * (w * z + x * y),
+        1.0 - 2.0 * (y * y + z * z),
+    )
+
+
 def rotate_vec(q, v):
     qv = (v[0], v[1], v[2], 0.0)
     r = quat_multiply_raw(quat_multiply_raw(normalize_quat(q), qv), quat_inverse(q))
@@ -119,6 +127,10 @@ def inverse_tf(tf):
     qi = quat_inverse(tf.q)
     ti = rotate_vec(qi, (-tf.t[0], -tf.t[1], -tf.t[2]))
     return Transform(ti, qi)
+
+
+def planarize_transform(tf, z=0.0):
+    return Transform((tf.t[0], tf.t[1], z), yaw_quat(yaw_from_quat(tf.q)))
 
 
 def transform_from_msg(msg):
@@ -180,6 +192,7 @@ class AprilTagGlobalLocalizer:
         self.max_tag_age_s = float(rospy.get_param("~max_tag_age_s", 0.5))
         self.max_tag_distance_m = float(rospy.get_param("~max_tag_distance_m", 2.0))
         self.hold_last_transform = get_bool_param("~hold_last_transform", True)
+        self.constrain_to_planar = get_bool_param("~constrain_to_planar", True)
         self.apply_legacy_orientation_correction = get_bool_param(
             "~apply_legacy_orientation_correction", True
         )
@@ -206,8 +219,9 @@ class AprilTagGlobalLocalizer:
         self.last_selected = None
 
         rospy.loginfo(
-            "[apriltag_global_localizer] loaded %d signboard poses from %s; publishing %s -> %s",
-            len(self.known_tags), self.global_map_yaml, self.global_frame, self.rtabmap_frame,
+            "[apriltag_global_localizer] loaded %d signboard poses from %s; publishing %s -> %s planar=%s",
+            len(self.known_tags), self.global_map_yaml, self.global_frame,
+            self.rtabmap_frame, self.constrain_to_planar,
         )
 
     def load_known_signboards(self, path):
@@ -304,6 +318,8 @@ class AprilTagGlobalLocalizer:
             if selected is not None:
                 dist, tag_name, global_from_tag, rtab_from_tag = selected
                 global_from_rtab = compose(global_from_tag, inverse_tf(rtab_from_tag))
+                if self.constrain_to_planar:
+                    global_from_rtab = planarize_transform(global_from_rtab)
                 self.last_global_from_rtab = global_from_rtab
                 self.last_selected = tag_name
                 self.publish_anchor(global_from_rtab, now)
@@ -312,6 +328,7 @@ class AprilTagGlobalLocalizer:
                     "distance_m": round(dist, 4),
                     "global_frame": self.global_frame,
                     "rtabmap_frame": self.rtabmap_frame,
+                    "planar": self.constrain_to_planar,
                 }, sort_keys=True)))
                 rospy.loginfo_throttle(
                     3.0,

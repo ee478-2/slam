@@ -181,10 +181,11 @@ rosrun tf tf_echo global_map map
 ```
 
 When a known signboard bundle is visible, the node uses `config/global_map.yaml`
-to publish `global_map -> map` plus `/global_localization/robot_pose`. The
-localization manager consumes that pose first, so `/odom` and `/robot_pose` are
-in `global_map` while the anchor is fresh; if no tag anchor is available, they
-fall back to RTAB's local odometry frame.
+to publish planar `global_map -> map` (x/y/yaw only) plus
+`/global_localization/robot_pose`. The localization manager consumes that pose
+first, so `/odom` and `/robot_pose` are in `global_map` while the anchor is
+fresh; if no tag anchor is available, they fall back to RTAB's local odometry
+frame.
 
 ---
 

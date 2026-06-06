@@ -21,6 +21,7 @@
   <arg name="max_tag_age_s" default="0.5"/>
   <arg name="max_tag_distance_m" default="2.0"/>
   <arg name="hold_last_transform" default="true"/>
+  <arg name="constrain_to_planar" default="true"/>
   <arg name="apply_legacy_orientation_correction" default="true"/>
 
   <node pkg="slam" type="apriltag_global_localizer.py"
@@ -34,6 +35,7 @@
     <param name="max_tag_age_s" value="$(arg max_tag_age_s)"/>
     <param name="max_tag_distance_m" value="$(arg max_tag_distance_m)"/>
     <param name="hold_last_transform" type="bool" value="$(arg hold_last_transform)"/>
+    <param name="constrain_to_planar" type="bool" value="$(arg constrain_to_planar)"/>
     <param name="apply_legacy_orientation_correction" type="bool"
            value="$(arg apply_legacy_orientation_correction)"/>
   </node>
