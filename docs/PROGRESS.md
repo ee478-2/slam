@@ -24,6 +24,8 @@ this file stays an index + current open items.** Newest first.
 ## Log index
 
 ### 2026-06 — real-robot `slam` → [`docs/progress/2026-06.md`](progress/2026-06.md)
+- **2026-06-06** temporary signboard HUD wiring — `b4aa6d8` · `slam up`
+  now starts `llm_agent` signboard recognition so mission RViz gets `/signboards/detections_image`.
 - **2026-06-06** mission RViz relaunch fix — `17aa5b5` · `slam mission`
   now runs `slam env`; new `slam mission-pub` starts `/mission/markers` only for laptop RViz.
 - **2026-06-06** mission RViz total view — `4b82198` · `/mission/markers`
