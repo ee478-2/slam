@@ -115,12 +115,15 @@ PY
 setsid roslaunch slam rtabmap_realsense.launch rviz:=false rtabmap_viz:=false \
   > /tmp/rtabmap.log 2>&1 &
 ```
-- Defaults: `--delete_db_on_start` (fresh map each run) and `--Odom/ResetCountdown 1`
-  (fail-fast VO recovery — without it a broken frame leaves odom LOST forever).
-- To **keep** a map across restarts: add `rtabmap_args:=""`.
+- Defaults: `--delete_db_on_start --Reg/Force3DoF true` (fresh map each run
+  with flat-ground x/y/yaw registration) and `--Odom/ResetCountdown 1`
+  (fail-fast VO recovery; without it a broken frame leaves odom LOST forever).
+- To **keep** a map across restarts while preserving the flat-ground prior, add
+  `rtabmap_args:="--Reg/Force3DoF true"`.
 - Verify:
 ```bash
 rosparam get /rtabmap/rgbd_odometry/Odom/ResetCountdown   # 1
+rosparam get /rtabmap/rgbd_odometry/Reg/Force3DoF         # true
 grep 'Odom: quality' /tmp/rtabmap.log | tail -1           # quality ~200-480, not 0
 ```
 

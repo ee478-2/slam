@@ -26,7 +26,10 @@
   <arg name="rviz"          default="true"/>
   <arg name="rtabmap_viz"   default="false"/>
   <arg name="localization"  default="false"/>
-  <arg name="rtabmap_args"  default="--delete_db_on_start"/>
+  <!-- Reg/Force3DoF=true: the real robot drives on flat ground, and this
+       launch uses frame_id=base_link. Constrain registration to x/y/yaw so
+       visual odometry and RTAB optimization do not accumulate roll/pitch/z. -->
+  <arg name="rtabmap_args"  default="--delete_db_on_start --Reg/Force3DoF true"/>
   <!-- Odom/ResetCountdown=1: fail-fast VO recovery. On the USB2 15fps stream a
        fast move/in-place rotation can break visual odometry; with the rtabmap
        default (ResetCountdown=0, never reset) odom stays LOST forever and the
