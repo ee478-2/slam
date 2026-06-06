@@ -73,10 +73,10 @@ setsid roslaunch slam arm_home.launch > /tmp/arm_home.log 2>&1 &
 ```
 
 Defaults are radians, matching `joint1` through `joint5`:
-`0.0 0.7 -1.4 -1.0 0.0`; gripper open is `-1.20` on
+`0 0.8 -3. -0.5 0`; gripper open is `-1.20` on
 `/r_joint_controller/command`. Override for one run:
 ```bash
-SLAM_ARM_HOME_POSE="0.0 0.7 -1.4 -1.0 0.0" \
+SLAM_ARM_HOME_POSE="0 0.8 -3. -0.5 0" \
 SLAM_GRIPPER_HOME_POSITION="-1.20" slam up
 ```
 

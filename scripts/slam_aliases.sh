@@ -58,7 +58,7 @@ slam() {
              echo "localization_manager (/odom + /robot_pose) -> /tmp/locman.log" ;;
 
     arm-home|arm_home)
-           local pose="${SLAM_ARM_HOME_POSE:-0.0 0.7 -1.4 -1.0 0.0}"
+           local pose="${SLAM_ARM_HOME_POSE:-0 0.8 -3. -0.5 0}"
            local gripper="${SLAM_GRIPPER_HOME_POSITION:--1.20}"
            setsid roslaunch slam arm_home.launch home_pose:="$pose" \
              gripper_position:="$gripper" >/tmp/arm_home.log 2>&1 & \

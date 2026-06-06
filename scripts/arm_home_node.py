@@ -14,7 +14,7 @@ DEFAULT_ARM_TOPICS = [
     "/joint4_controller/command",
     "/joint5_controller/command",
 ]
-DEFAULT_HOME_POSE = [0.0, 0.7, -1.4, -1.0, 0.0]
+DEFAULT_HOME_POSE = [0.0, 0.8, -3.0, -0.5, 0.0]
 DEFAULT_GRIPPER_TOPIC = "/r_joint_controller/command"
 DEFAULT_GRIPPER_POSITION = -1.20
 

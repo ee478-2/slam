@@ -1,6 +1,6 @@
 <launch>
   <!-- Joint values are radians, matching the ArmPi controller topics. -->
-  <arg name="home_pose" default="0.0 0.7 -1.4 -1.0 0.0"/>
+  <arg name="home_pose" default="0 0.8 -3. -0.5 0"/>
   <arg name="gripper_position" default="-1.20"/>
   <arg name="publish_gripper" default="true"/>
   <arg name="gripper_publish_duration" default="0.75"/>
