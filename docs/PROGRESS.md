@@ -14,8 +14,8 @@ this file stays an index + current open items.** Newest first.
 - **"go to store_N" — step 2** = AprilTag *global* localization: rtabmap's map frame ≠
   `config/global_map.yaml` room frame, so absolute/global localization is not wired yet.
 - **Loop closure via tag re-observation** — not yet captured (drive back to a seen tag).
-- **Wheel `/odom`** — chassis publishes none; we republish the fused pose as `/odom`
-  (pose-only, twist zero). True wheel odometry still unwired.
+- **Wheel odometry calibration / true encoders** — `/wheel/odom` now exists as
+  command-integrated odom; chassis still publishes no encoder/tick feedback.
 - **Chassis wheel-dropout** — root-caused to the stock Pi `chassis_control_node.py`
   (th-race + `slow_velocity` ramp); real fix is Pi-side, deliberately NOT applied (user's call).
 - **USB3 cable** — D435 still on USB2; 640x480@15, IR/IMU-off is the validated fallback.
@@ -24,6 +24,9 @@ this file stays an index + current open items.** Newest first.
 ## Log index
 
 ### 2026-06 — real-robot `slam` → [`docs/progress/2026-06.md`](progress/2026-06.md)
+- **2026-06-06** `/wheel/odom` command odometry — `db5668a` · added a
+  command-integrated wheel odom topic from `/chassis_control/set_velocity`;
+  true encoder feedback remains Pi-side/unexposed.
 - **2026-06-06** mission RViz label cleanup — `4b396af` · removed raw xy
   coordinate text from store/signboard/robot marker labels while keeping marker positions.
 - **2026-06-06** remove temporary signboard HUD wiring — `8800590` · backed
