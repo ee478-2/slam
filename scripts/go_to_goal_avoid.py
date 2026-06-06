@@ -69,8 +69,8 @@ class SetVelocity(genpy.Message):
 
 # --- frames / pose ---
 MAP_FRAME = "map"
-ROBOT_FRAME = "camera_link"
-HEADING_OFFSET_DEG = 0.0       # camera_link +x vs chassis forward (same as go_to_goal)
+ROBOT_FRAME = "base_link"      # rtabmap tracks base_link (base_link->camera_link static TF)
+HEADING_OFFSET_DEG = 0.0       # base_link +x vs chassis forward (mount yaw=0 -> 0)
 
 # --- depth obstacle sensing ---
 DEPTH_TOPIC = "/camera/aligned_depth_to_color/image_raw"   # 16UC1, mm
@@ -250,7 +250,11 @@ def main():
                     sys.stdout.write("\r depth stale -> hold        "); sys.stdout.flush()
                     rate.sleep(); continue
 
-                # desired heading = goal-attractive + obstacle-repulsive, in the
+		# [ADD THIS BLOCK] 
+                # Symmetry breaking: If an obstacle is dead ahead, force a turn.
+                if rep_fwd < -0.3 and abs(rep_left) < 0.15:
+                    rep_left = 0.5  # Bias to always turn left when stuck head-on                
+		# desired heading = goal-attractive + obstacle-repulsive, in the
                 # chassis frame (camera yaw corrected by HEADING_OFFSET_DEG).
                 chassis_yaw = ryaw - math.radians(HEADING_OFFSET_DEG)
                 bearing = norm_angle(math.atan2(dy, dx) - chassis_yaw)

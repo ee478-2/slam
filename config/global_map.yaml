@@ -1,0 +1,247 @@
+# Unified semantic/global map for the EE478 room map.
+#
+# Primary global coordinates come from EE478_MAP_INFO, while AprilTag bundle
+# layouts and signboard semantics are centralized here for runtime consumers.
+
+metadata:
+  map_name: ee478_n1_room113
+  frame_id: map
+  primary_coordinate_source: slam/EE478_MAP_INFO/ee478_n1_room113.yaml
+  store_coordinate_source: slam/EE478_MAP_INFO/store_xy.yaml
+  tag_layout_source: slam/localization_manager/config/tags.yaml
+  coordinate_convention:
+    x: forward in ROS map frame
+    y: left in ROS map frame
+    z: up in ROS map frame
+    yaw_deg: 0 deg faces +X and follows the right-hand rule
+
+stores:
+  - {id: store_burger_A, category: burger, x: -1.25, y: -1.15, visit_offset: {x: -0.35, y: 0.00, yaw: 0.0}, visited: false}
+  - {id: store_burger_B, category: burger, x: 1.25, y: -0.85, visit_offset: {x: 0.35, y: 0.00, yaw: 3.14}, visited: false}
+  - {id: store_cafe_A, category: cafe, x: -0.75, y: -0.85, visit_offset: {x: 0.35, y: 0.00, yaw: 3.14}, visited: false}
+  - {id: store_cafe_B, category: cafe, x: 1.00, y: -1.65, visit_offset: {x: 0.00, y: -0.35, yaw: 1.57}, visited: false}
+  - {id: store_phar_A, category: pharmacy, x: 1.00, y: 1.50, visit_offset: {x: 0.00, y: -0.35, yaw: 1.57}, visited: false}
+  - {id: store_phar_B, category: pharmacy, x: 0.75, y: -1.20, visit_offset: {x: -0.35, y: 0.00, yaw: 0.00}, visited: false}
+  - {id: store_store_A, category: convenience_store, x: -1.00, y: 1.50, visit_offset: {x: 0.00, y: -0.35, yaw: 1.57}, visited: false}
+  - {id: store_store_B, category: convenience_store, x: -1.00, y: -1.65, visit_offset: {x: 0.00, y: -0.35, yaw: 1.57}, visited: false}
+
+signboards:
+  SIGNBOARD01:
+    model: signboard_white_01
+    pose: {x: -2.000, y: -2.135, z: 0.365, yaw_deg: 270.0}
+    tags:
+      - id: 1
+        size: 0.020
+        slot: left
+        local_pose: {x: -0.0655, y: 0.0, z: 0.0, qw: 1.0, qx: 0.0, qy: 0.0, qz: 0.0}
+        semantic: {arrow: left, icon: convenience_store}
+
+  SIGNBOARD02:
+    model: signboard_white_02
+    pose: {x: -2.000, y: 0.635, z: 0.365, yaw_deg: 90.0}
+    tags:
+      - id: 2
+        size: 0.020
+        slot: center
+        local_pose: {x: 0.0112, y: 0.0, z: 0.0, qw: 1.0, qx: 0.0, qy: 0.0, qz: 0.0}
+        semantic: {arrow: straight, icon: pickup_point}
+      - id: 3
+        size: 0.020
+        slot: right
+        local_pose: {x: 0.0879, y: 0.0, z: 0.0, qw: 1.0, qx: 0.0, qy: 0.0, qz: 0.0}
+        semantic: {arrow: right, icon: convenience_store}
+
+  SIGNBOARD03:
+    model: signboard_white_03
+    pose: {x: -2.000, y: 0.865, z: 0.365, yaw_deg: 270.0}
+    tags:
+      - id: 4
+        size: 0.020
+        slot: left
+        local_pose: {x: -0.0655, y: 0.0, z: 0.0, qw: 1.0, qx: 0.0, qy: 0.0, qz: 0.0}
+        semantic: {arrow: left, icon: convenience_store}
+      - id: 5
+        size: 0.020
+        slot: center
+        local_pose: {x: 0.0112, y: 0.0, z: 0.0, qw: 1.0, qx: 0.0, qy: 0.0, qz: 0.0}
+        semantic: {arrow: straight, icon: hamburger}
+
+  SIGNBOARD04:
+    model: signboard_white_04
+    pose: {x: -1.880, y: -2.250, z: 0.365, yaw_deg: 180.0}
+    tags:
+      - id: 6
+        size: 0.020
+        slot: right
+        local_pose: {x: 0.0879, y: 0.0, z: 0.0, qw: 1.0, qx: 0.0, qy: 0.0, qz: 0.0}
+        semantic: {arrow: right, icon: hamburger}
+
+  SIGNBOARD05:
+    model: signboard_white_05
+    pose: {x: -1.880, y: 0.750, z: 0.365, yaw_deg: 180.0}
+    tags:
+      - id: 7
+        size: 0.020
+        slot: left
+        local_pose: {x: -0.0655, y: 0.0, z: 0.0, qw: 1.0, qx: 0.0, qy: 0.0, qz: 0.0}
+        semantic: {arrow: left, icon: hamburger}
+      - id: 8
+        size: 0.020
+        slot: right
+        local_pose: {x: 0.0879, y: 0.0, z: 0.0, qw: 1.0, qx: 0.0, qy: 0.0, qz: 0.0}
+        semantic: {arrow: right, icon: pickup_point}
+
+  SIGNBOARD06:
+    model: signboard_white_06
+    pose: {x: -0.120, y: -2.250, z: 0.365, yaw_deg: 0.0}
+    tags:
+      - id: 9
+        size: 0.020
+        slot: left
+        local_pose: {x: -0.0655, y: 0.0, z: 0.0, qw: 1.0, qx: 0.0, qy: 0.0, qz: 0.0}
+        semantic: {arrow: left, icon: pharmacy}
+      - id: 10
+        size: 0.020
+        slot: center
+        local_pose: {x: 0.0112, y: 0.0, z: 0.0, qw: 1.0, qx: 0.0, qy: 0.0, qz: 0.0}
+        semantic: {arrow: straight, icon: cafe}
+
+  SIGNBOARD07:
+    model: signboard_white_07
+    pose: {x: -0.120, y: 0.750, z: 0.365, yaw_deg: 0.0}
+    tags:
+      - id: 11
+        size: 0.020
+        slot: center
+        local_pose: {x: 0.0112, y: 0.0, z: 0.0, qw: 1.0, qx: 0.0, qy: 0.0, qz: 0.0}
+        semantic: {arrow: straight, icon: pharmacy}
+      - id: 12
+        size: 0.020
+        slot: right
+        local_pose: {x: 0.0879, y: 0.0, z: 0.0, qw: 1.0, qx: 0.0, qy: 0.0, qz: 0.0}
+        semantic: {arrow: right, icon: cafe}
+
+  SIGNBOARD08:
+    model: signboard_white_08
+    pose: {x: 0.000, y: -2.135, z: 0.365, yaw_deg: 270.0}
+    tags:
+      - id: 13
+        size: 0.020
+        slot: left
+        local_pose: {x: -0.0655, y: 0.0, z: 0.0, qw: 1.0, qx: 0.0, qy: 0.0, qz: 0.0}
+        semantic: {arrow: left, icon: cafe}
+      - id: 14
+        size: 0.020
+        slot: right
+        local_pose: {x: 0.0879, y: 0.0, z: 0.0, qw: 1.0, qx: 0.0, qy: 0.0, qz: 0.0}
+        semantic: {arrow: right, icon: convenience_store}
+
+  SIGNBOARD09:
+    model: signboard_white_09
+    pose: {x: 0.000, y: 0.635, z: 0.365, yaw_deg: 90.0}
+    tags:
+      - id: 15
+        size: 0.020
+        slot: left
+        local_pose: {x: -0.0655, y: 0.0, z: 0.0, qw: 1.0, qx: 0.0, qy: 0.0, qz: 0.0}
+        semantic: {arrow: left, icon: convenience_store}
+      - id: 16
+        size: 0.020
+        slot: right
+        local_pose: {x: 0.0879, y: 0.0, z: 0.0, qw: 1.0, qx: 0.0, qy: 0.0, qz: 0.0}
+        semantic: {arrow: right, icon: pharmacy}
+
+  SIGNBOARD10:
+    model: signboard_white_10
+    pose: {x: 0.120, y: -2.250, z: 0.365, yaw_deg: 180.0}
+    tags:
+      - id: 17
+        size: 0.020
+        slot: center
+        local_pose: {x: 0.0112, y: 0.0, z: 0.0, qw: 1.0, qx: 0.0, qy: 0.0, qz: 0.0}
+        semantic: {arrow: straight, icon: convenience_store}
+      - id: 18
+        size: 0.020
+        slot: right
+        local_pose: {x: 0.0879, y: 0.0, z: 0.0, qw: 1.0, qx: 0.0, qy: 0.0, qz: 0.0}
+        semantic: {arrow: right, icon: pharmacy}
+
+  SIGNBOARD11:
+    model: signboard_white_11
+    pose: {x: 0.120, y: 0.750, z: 0.365, yaw_deg: 180.0}
+    tags:
+      - id: 19
+        size: 0.020
+        slot: left
+        local_pose: {x: -0.0655, y: 0.0, z: 0.0, qw: 1.0, qx: 0.0, qy: 0.0, qz: 0.0}
+        semantic: {arrow: left, icon: cafe}
+      - id: 20
+        size: 0.020
+        slot: center
+        local_pose: {x: 0.0112, y: 0.0, z: 0.0, qw: 1.0, qx: 0.0, qy: 0.0, qz: 0.0}
+        semantic: {arrow: straight, icon: convenience_store}
+
+  SIGNBOARD12:
+    model: signboard_white_12
+    pose: {x: 1.880, y: -2.250, z: 0.365, yaw_deg: 0.0}
+    tags:
+      - id: 21
+        size: 0.020
+        slot: left
+        local_pose: {x: -0.0655, y: 0.0, z: 0.0, qw: 1.0, qx: 0.0, qy: 0.0, qz: 0.0}
+        semantic: {arrow: left, icon: hamburger}
+
+  SIGNBOARD13:
+    model: signboard_white_13
+    pose: {x: 1.880, y: 0.750, z: 0.365, yaw_deg: 0.0}
+    tags:
+      - id: 22
+        size: 0.020
+        slot: left
+        local_pose: {x: -0.0655, y: 0.0, z: 0.0, qw: 1.0, qx: 0.0, qy: 0.0, qz: 0.0}
+        semantic: {arrow: left, icon: pickup_point}
+      - id: 23
+        size: 0.020
+        slot: right
+        local_pose: {x: 0.0879, y: 0.0, z: 0.0, qw: 1.0, qx: 0.0, qy: 0.0, qz: 0.0}
+        semantic: {arrow: right, icon: hamburger}
+
+  SIGNBOARD14:
+    model: signboard_white_14
+    pose: {x: 2.000, y: -2.135, z: 0.365, yaw_deg: 270.0}
+    tags:
+      - id: 24
+        size: 0.020
+        slot: right
+        local_pose: {x: 0.0879, y: 0.0, z: 0.0, qw: 1.0, qx: 0.0, qy: 0.0, qz: 0.0}
+        semantic: {arrow: right, icon: cafe}
+
+  SIGNBOARD15:
+    model: signboard_white_15
+    pose: {x: 2.000, y: 0.635, z: 0.365, yaw_deg: 90.0}
+    tags:
+      - id: 25
+        size: 0.020
+        slot: left
+        local_pose: {x: -0.0655, y: 0.0, z: 0.0, qw: 1.0, qx: 0.0, qy: 0.0, qz: 0.0}
+        semantic: {arrow: left, icon: pharmacy}
+      - id: 26
+        size: 0.020
+        slot: center
+        local_pose: {x: 0.0112, y: 0.0, z: 0.0, qw: 1.0, qx: 0.0, qy: 0.0, qz: 0.0}
+        semantic: {arrow: straight, icon: pickup_point}
+
+  SIGNBOARD16:
+    model: signboard_white_16
+    pose: {x: 2.000, y: 0.865, z: 0.365, yaw_deg: 270.0}
+    tags:
+      - id: 27
+        size: 0.020
+        slot: center
+        local_pose: {x: 0.0112, y: 0.0, z: 0.0, qw: 1.0, qx: 0.0, qy: 0.0, qz: 0.0}
+        semantic: {arrow: straight, icon: hamburger}
+      - id: 28
+        size: 0.020
+        slot: right
+        local_pose: {x: 0.0879, y: 0.0, z: 0.0, qw: 1.0, qx: 0.0, qy: 0.0, qz: 0.0}
+        semantic: {arrow: right, icon: pharmacy}

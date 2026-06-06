@@ -42,7 +42,7 @@ as the source for the report's "software stack design" section.
 ```
 /home/d/llm-skill/
 ├── config/                                   # YAML knowledge files
-│   ├── signboards.yaml                       # 28 tag_id → labels + xy
+│   ├── global_map.yaml                       # stores + signboards + tag semantics
 │   └── stores.yaml                           # 8 store coords (category=unknown)
 ├── docs/
 │   ├── PROGRESS.md                           # chronological session log
@@ -211,16 +211,24 @@ SIGNBOARD09) at 30 Hz.
 like the tag's world position, not the camera's. Diagnose later; for
 now `pose_source=sim_gt` skips this branch.
 
-### 4.4 `config/signboards.yaml` — 28 hand-authored tag-id entries
-**Where:** `config/signboards.yaml`
+### 4.4 `slam/config/global_map.yaml` — 28 signboard tag entries
+**Where:** `slam/config/global_map.yaml`
 
-For each AprilTag bundle ID (1..28 from `tags.yaml`), the YAML stores:
+For each AprilTag bundle ID (1..28 from `tags.yaml`), `signboards.*.tags`
+stores:
 
 ```yaml
 signboards:
-  15: {parent: signboard_white_09, slot: left,  arrow: left,  icon: convenience_store, x: 0.000, y: 0.629}
-  16: {parent: signboard_white_09, slot: right, arrow: right, icon: pharmacy,          x: 0.000, y: 0.629}
-  …
+  SIGNBOARD09:
+    model: signboard_white_09
+    pose: {x: 0.000, y: 0.635, z: 0.365, yaw_deg: 90.0}
+    tags:
+      - id: 15
+        slot: left
+        semantic: {arrow: left, icon: convenience_store}
+      - id: 16
+        slot: right
+        semantic: {arrow: right, icon: pharmacy}
 ```
 
 **How the mapping was derived.** Three sources cross-referenced:
@@ -268,7 +276,7 @@ of signboards components" loop. Inputs:
   were when we saw a tag.
 - `/camera/color/image_raw` — for the HUD overlay.
 
-Static knowledge: `config/signboards.yaml`.
+Static knowledge: `slam/config/global_map.yaml`.
 
 For each detection event with non-empty `detections`, it emits one
 `std_msgs/String` JSON message on `/signboards/detections`:
