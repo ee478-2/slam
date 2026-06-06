@@ -25,6 +25,8 @@ this file stays an index + current open items.** Newest first.
 ## Log index
 
 ### 2026-06 — real-robot `slam` → [`docs/progress/2026-06.md`](progress/2026-06.md)
+- **2026-06-06** detected-tag ID global anchor matching — `70c5fa5` · anchors
+  from `/tag_detections.id -> SIGNBOARDxx` instead of relying on signboard TF names.
 - **2026-06-06** planar AprilTag global anchor — `77f69de` · constrained
   `global_map -> map` to x/y/yaw so RTAB does not tilt/flip in `mission.rviz`.
 - **2026-06-06** AprilTag global RTAB anchor + `/odom` — `a6783dd` · added
