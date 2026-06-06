@@ -28,7 +28,7 @@ equivalents are the Claude skills `slam-bringup` / `slam-mapmon` / `slam-shutdow
 Source once, then one-word commands:
 ```bash
 source ~/catkin_ws/src/slam/scripts/slam_aliases.sh   # add to ~/.bashrc to make permanent
-slam up            # env + camera + rtabmap + apriltag + signboard HUD
+slam up            # env + camera + rtabmap + apriltag
 slam teleop        # drive
 slam rviz          # viewer on :1   (slam rviz yolo for the YOLO view)
 slam check         # quick status:  nodes / landmarks / tags seen
@@ -36,8 +36,8 @@ slam mon           # 15s map+VO monitor
 slam down          # SIGINT teardown (camera stopped last)
 slam help          # full list
 ```
-Individual steps: `slam env | cam | rtab | tags | signs | yolo`. Override the Pi
-IP / GUI display with `SLAM_PI=...`, `SLAM_DISPLAY=:0` before sourcing.
+Individual steps: `slam env | cam | rtab | tags | yolo`. Override the Pi IP / GUI
+display with `SLAM_PI=...`, `SLAM_DISPLAY=:0` before sourcing.
 
 The rest of this file is the long form of exactly what those shortcuts run.
 
@@ -132,30 +132,7 @@ PY
 
 ---
 
-## 4. Signboard semantic HUD (temporary llm_agent wiring)
-
-`slam up` starts this automatically after AprilTag detection:
-```bash
-setsid rosrun llm_agent signboard_recognition_node.py \
-  _global_map_yaml:=$HOME/catkin_ws/src/slam/config/global_map.yaml \
-  _publish_hud:=true \
-  _hud_source_topic:=/tag_detections_image \
-  _hud_fallback_topic:=/camera/color/image_raw \
-  > /tmp/signboards.log 2>&1 &
-```
-- Consumes `/tag_detections`, `/tag_detections_image`, `/camera/color/image_raw`,
-  and `/robot_pose` if available.
-- Publishes `/signboards/detections` and `/signboards/detections_image`.
-- This runs only the `llm_agent` signboard recognizer; it does **not** start
-  another AprilTag detector and does not start the LLM planner.
-```bash
-rostopic echo -n1 /signboards/detections
-rostopic echo -n1 /signboards/detections_image/header
-```
-
----
-
-## 4b. YOLO object detection (manipulation_control — outside slam scope, run with permission)
+## 4. YOLO object detection (manipulation_control — outside slam scope, run with permission)
 
 ```bash
 setsid rosrun manipulation_control object_detection.py \
