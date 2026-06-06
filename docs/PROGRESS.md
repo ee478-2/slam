@@ -24,6 +24,8 @@ this file stays an index + current open items.** Newest first.
 ## Log index
 
 ### 2026-06 — real-robot `slam` → [`docs/progress/2026-06.md`](progress/2026-06.md)
+- **2026-06-06** mission RViz label cleanup — `4b396af` · removed raw xy
+  coordinate text from store/signboard/robot marker labels while keeping marker positions.
 - **2026-06-06** remove temporary signboard HUD wiring — `8800590` · backed
   `llm_agent` signboard recognition back out of `slam up`; launch it explicitly when needed.
 - **2026-06-06** temporary signboard HUD wiring — `b4aa6d8` · `slam up`
