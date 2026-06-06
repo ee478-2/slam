@@ -24,6 +24,8 @@ this file stays an index + current open items.** Newest first.
 ## Log index
 
 ### 2026-06 — real-robot `slam` → [`docs/progress/2026-06.md`](progress/2026-06.md)
+- **2026-06-06** arm home default pose update — `018157c` · changed the
+  `slam arm-home` / `slam up` default to `0 0.8 -3. -0.5 0`.
 - **2026-06-06** arm home on `slam up` — `d41a9b6` · added a
   `slam`-side one-shot arm-home publisher and wired it into the startup shortcut.
 - **2026-06-06** RTAB-vs-wheel odom RViz — `de38748` · added a
