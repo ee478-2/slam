@@ -25,6 +25,8 @@ this file stays an index + current open items.** Newest first.
 ## Log index
 
 ### 2026-06 — real-robot `slam` → [`docs/progress/2026-06.md`](progress/2026-06.md)
+- **2026-06-06** revert planner-safe `/odom` split — `f55cb22` · restores
+  selected fused pose publishing on `/odom` per user request.
 - **2026-06-06** planar AprilTag anchor solve — `1fb2d38` · computes
   `global_map -> map` directly in x/y/yaw so the detected tag point lands on the configured signboard.
 - **2026-06-06** detected-tag ID global anchor matching — `70c5fa5` · anchors
