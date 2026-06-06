@@ -171,7 +171,7 @@ DISPLAY=:1 setsid rviz -d ~/catkin_ws/src/slam/rviz/apriltag_rtabmap.rviz > /tmp
 # YOLO debug image:
 DISPLAY=:1 setsid rviz -d ~/catkin_ws/src/slam/rviz/yolo.rviz > /tmp/rviz.log 2>&1 &
 # Total mission view: global stores/signboards + status + rtabmap + tags + grasp:
-DISPLAY=:1 setsid roslaunch slam mission_viz.launch > /tmp/mission_viz.log 2>&1 &
+slam mission
 # rtabmap's own viewer (shows landmarks in the graph):
 DISPLAY=:1 ROS_NAMESPACE=rtabmap setsid rosrun rtabmap_viz rtabmap_viz _frame_id:=camera_link &
 ```
@@ -215,7 +215,8 @@ For the **total mission view**, first run the marker publisher on the Jetson,
 then run RViz on your PC:
 ```bash
 # on Jetson
-roslaunch slam mission_viz.launch run_rviz:=false
+source ~/catkin_ws/src/slam/scripts/slam_aliases.sh
+slam mission-pub
 
 # on your PC
 scp ee478_team2@192.168.0.101:~/catkin_ws/src/slam/rviz/mission.rviz /tmp/
