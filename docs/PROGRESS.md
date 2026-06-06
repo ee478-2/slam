@@ -11,10 +11,9 @@ this file stays an index + current open items.** Newest first.
 
 - **`go_to_goal_avoid` tuning** — in-place yaw "wari-gari" oscillation on hardware; an
   oscillation fix was tried then reverted. Still being tuned.
-- **AprilTag global localization verification** — `a6783dd`/`4582ad3` wire
-  `global_map -> map` and global `/robot_pose` while keeping `/odom`
-  continuous for local planning; needs live robot validation against real tag
-  observations.
+- **AprilTag global localization verification** — `a6783dd` wires
+  `global_map -> map` and global `/odom` when known signboard tags are visible;
+  needs live robot validation against real tag observations.
 - **Loop closure via tag re-observation** — not yet captured (drive back to a seen tag).
 - **Wheel odometry calibration / true encoders** — `/wheel/odom` now exists as
   command-integrated odom; chassis still publishes no encoder/tick feedback.
@@ -26,8 +25,6 @@ this file stays an index + current open items.** Newest first.
 ## Log index
 
 ### 2026-06 — real-robot `slam` → [`docs/progress/2026-06.md`](progress/2026-06.md)
-- **2026-06-06** planner-safe `/odom` during AprilTag correction — `4582ad3` ·
-  keeps `/odom` on continuous `/rtabmap/odom`; publishes tag-corrected pose separately as `/global_odom`.
 - **2026-06-06** planar AprilTag anchor solve — `1fb2d38` · computes
   `global_map -> map` directly in x/y/yaw so the detected tag point lands on the configured signboard.
 - **2026-06-06** detected-tag ID global anchor matching — `70c5fa5` · anchors

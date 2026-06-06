@@ -58,9 +58,9 @@ slam() {
              >/tmp/global_loc.log 2>&1 & \
              echo "apriltag global localization (global_map->map, /global_localization/robot_pose) -> /tmp/global_loc.log" ;;
 
-    loc)   # localization_manager: fused pose -> /robot_pose, continuous RTAB odom -> /odom
+    loc)   # localization_manager: fuses tag/rtabmap pose -> /robot_pose + /odom
            setsid roslaunch slam localization_manager.launch >/tmp/locman.log 2>&1 & \
-             echo "localization_manager (/odom continuous, /robot_pose fused, /global_odom diagnostic) -> /tmp/locman.log" ;;
+             echo "localization_manager (/odom + /robot_pose) -> /tmp/locman.log" ;;
 
     arm-home|arm_home)
            local pose="${SLAM_ARM_HOME_POSE:-0 0.8 -3. -0.5 0}"
@@ -104,9 +104,8 @@ slam() {
            timeout 2 rostopic echo -n1 /camera/depth/color/points/header >/dev/null 2>&1 || { echo "pointcloud did not stream; tail /tmp/rs_camera.log"; tail -n 80 /tmp/rs_camera.log; return 1; }
            slam wheel; slam rtab; slam tags; slam global-loc; slam loc
            echo "stack up (arm home+camera+wheel odom+rtabmap+apriltag+global localization+localization). /wheel/odom + /odom + /robot_pose"
-           echo "  /odom stays continuous from /rtabmap/odom for local planning"
-           echo "  AprilTag correction goes to /robot_pose and /global_odom"
-           echo "  check: rostopic echo -n1 /global_localization/selected_tag && rostopic echo -n1 /odom/header && rostopic echo -n1 /global_odom/header"
+           echo "  /odom is global_map when a known signboard tag anchors RTAB; otherwise it falls back to RTAB odom"
+           echo "  check: rostopic echo -n1 /global_localization/selected_tag && rostopic echo -n1 /odom/header"
            echo "NOTE: RViz is SEPARATE -> 'slam rviz' (on :1), or run rviz on your PC." ;;
 
     mon)   python3 - <<'PY'
@@ -178,7 +177,7 @@ slam <cmd>:
   rtab          rtabmap RGB-D SLAM
   tags          apriltag detection (+ rtabmap landmarks)
   global-loc    AprilTag anchor: publish global_map->map + global robot pose
-  loc           localization_manager -> /robot_pose + continuous /odom + /global_odom
+  loc           localization_manager -> /robot_pose + /odom (global if anchored)
   yolo          YOLO object detection
   teleop        keyboard teleop (foreground)
   rviz [name]   rviz on $SLAM_DISPLAY (default apriltag_rtabmap; or: slam rviz yolo)
