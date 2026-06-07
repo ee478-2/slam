@@ -25,6 +25,8 @@ this file stays an index + current open items.** Newest first.
 ## Log index
 
 ### 2026-06 — real-robot `slam` → [`docs/progress/2026-06.md`](progress/2026-06.md)
+- **2026-06-07** camera-only storefront collection — `93c37b6` · adds
+  `slam collect-cam` so YOLO data capture can run without RTAB/AprilTags/localization.
 - **2026-06-07** storefront YOLO data pipeline — `4e98232` · adds
   teleop image collection plus CVAT-to-Ultralytics prep and YOLO11 training/export code.
 - **2026-06-06** flat-ground RTAB prior — `94976ba` · adds
