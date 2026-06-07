@@ -72,6 +72,7 @@ catkin_install_python(PROGRAMS
   scripts/apriltag_global_localizer.py
   scripts/mission_viz_publisher.py
   scripts/odom_compare_viz.py
+  scripts/storefront_dataset_collector.py
   scripts/wheel_odom_node.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )

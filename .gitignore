@@ -17,6 +17,14 @@ __pycache__/
 *.bag
 *.db
 *.pyc
+*.pt
+*.onnx
+*.engine
+*.torchscript
+*.weights
+data/storefront_yolo/raw/
+data/storefront_yolo/dataset/
+training/storefront_yolo/runs/
 
 # 16 MB third-party mesh — exceeds the 10 MB commit rule; re-fetch from the
 # realsense_gazebo_plugin upstream when the simulator needs it.

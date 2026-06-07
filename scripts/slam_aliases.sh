@@ -2,6 +2,7 @@
 #
 #   source ~/catkin_ws/src/slam/scripts/slam_aliases.sh
 #   slam up        # env + arm home + camera + wheel odom + rtabmap + apriltag
+#   slam collect   # save storefront YOLO images while teleop drives
 #   slam help      # list everything
 #
 # Add the source line to ~/.bashrc to get it in every shell.
@@ -72,6 +73,17 @@ slam() {
     yolo)  setsid rosrun manipulation_control object_detection.py \
              _base_frame:=camera_link _visualize:=true _inference_hz:=8.0 \
              >/tmp/yolo_det.log 2>&1 & echo "yolo -> /tmp/yolo_det.log" ;;
+
+    collect|collect-data|storefront-data)
+           local out="${SLAM_STORE_YOLO_RAW:-$SLAM_WS/src/slam/data/storefront_yolo/raw}"
+           local hz="${SLAM_STORE_YOLO_HZ:-2.0}"
+           local session="${SLAM_STORE_YOLO_SESSION:-}"
+           setsid roslaunch slam storefront_data_collection.launch \
+             output_root:="$out" capture_hz:="$hz" session:="$session" \
+             >/tmp/storefront_collect.log 2>&1 & \
+             echo "storefront image collector -> /tmp/storefront_collect.log"
+           echo "  output: $out"
+           echo "  drive with: slam teleop" ;;
 
     teleop) rosrun slam teleop_keyboard.py ;;   # foreground, needs a real keyboard
 
@@ -155,6 +167,8 @@ PY
       pkill -INT -f 'roslaunch slam localization_manager' 2>/dev/null
       pkill -INT -f 'roslaunch slam apriltag_global_localization' 2>/dev/null
       pkill -INT -f 'roslaunch slam wheel_odom' 2>/dev/null
+      pkill -INT -f 'roslaunch slam storefront_data_collection' 2>/dev/null
+      pkill -INT -f 'storefront_dataset_collector.py' 2>/dev/null
       pkill -INT -f 'roslaunch slam apriltag_realsense' 2>/dev/null
       pkill -INT -f 'roslaunch slam rtabmap_realsense' 2>/dev/null
       pkill -f 'object_detection.py' 2>/dev/null
@@ -179,6 +193,7 @@ slam <cmd>:
   global-loc    AprilTag anchor: publish global_map->map + global robot pose
   loc           localization_manager -> /robot_pose + /odom (global if anchored)
   yolo          YOLO object detection
+  collect       save storefront YOLO images while teleop drives
   teleop        keyboard teleop (foreground)
   rviz [name]   rviz on $SLAM_DISPLAY (default apriltag_rtabmap; or: slam rviz yolo)
   odom-viz      RViz compare: RTAB green, wheel odom red (no AprilTag displays)

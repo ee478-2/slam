@@ -1,0 +1,29 @@
+<launch>
+  <!-- Collect RGB images while driving with `slam teleop` in another terminal. -->
+  <arg name="image_topic" default="/camera/color/image_raw"/>
+  <arg name="odom_topic" default="/odom"/>
+  <arg name="output_root" default="$(find slam)/data/storefront_yolo/raw"/>
+  <arg name="session" default=""/>
+  <arg name="capture_hz" default="2.0"/>
+  <arg name="min_translation_m" default="0.08"/>
+  <arg name="min_yaw_deg" default="6.0"/>
+  <arg name="jpeg_quality" default="92"/>
+  <arg name="max_images" default="0"/>
+  <arg name="startup_delay_sec" default="0.0"/>
+  <arg name="class_names" default="storefront"/>
+
+  <node pkg="slam" type="storefront_dataset_collector.py"
+        name="storefront_dataset_collector" output="screen">
+    <param name="image_topic" value="$(arg image_topic)"/>
+    <param name="odom_topic" value="$(arg odom_topic)"/>
+    <param name="output_root" value="$(arg output_root)"/>
+    <param name="capture_hz" value="$(arg capture_hz)"/>
+    <param name="min_translation_m" value="$(arg min_translation_m)"/>
+    <param name="min_yaw_deg" value="$(arg min_yaw_deg)"/>
+    <param name="jpeg_quality" value="$(arg jpeg_quality)"/>
+    <param name="max_images" value="$(arg max_images)"/>
+    <param name="startup_delay_sec" value="$(arg startup_delay_sec)"/>
+    <param name="class_names" value="$(arg class_names)"/>
+    <param if="$(eval arg('session') != '')" name="session" value="$(arg session)"/>
+  </node>
+</launch>
