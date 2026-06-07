@@ -2,6 +2,7 @@
 #
 #   source ~/catkin_ws/src/slam/scripts/slam_aliases.sh
 #   slam up        # env + arm home + camera + wheel odom + rtabmap + apriltag
+#   slam collect-cam # camera-only data collection; no rtab/apriltag/localization
 #   slam collect   # save storefront YOLO images while teleop drives
 #   slam help      # list everything
 #
@@ -84,6 +85,22 @@ slam() {
              echo "storefront image collector -> /tmp/storefront_collect.log"
            echo "  output: $out"
            echo "  drive with: slam teleop" ;;
+
+    collect-cam|collect_cam|data-cam|data_cam)
+           slam env
+           if ! pgrep -f 'rs_camera.launch' >/dev/null 2>&1; then
+             slam cam
+             echo "...waiting for camera color stream"
+             local i; for i in $(seq 1 20); do
+               timeout 2 rostopic echo -n1 /camera/color/image_raw/header >/dev/null 2>&1 && { echo "camera streaming"; break; }
+               sleep 1
+             done
+             timeout 2 rostopic echo -n1 /camera/color/image_raw/header >/dev/null 2>&1 || { echo "camera did not stream; tail /tmp/rs_camera.log"; tail -n 80 /tmp/rs_camera.log; return 1; }
+           else
+             echo "camera already running"
+           fi
+           slam collect
+           echo "camera-only collection running; no RTAB/AprilTag/localization started" ;;
 
     teleop) rosrun slam teleop_keyboard.py ;;   # foreground, needs a real keyboard
 
@@ -193,6 +210,7 @@ slam <cmd>:
   global-loc    AprilTag anchor: publish global_map->map + global robot pose
   loc           localization_manager -> /robot_pose + /odom (global if anchored)
   yolo          YOLO object detection
+  collect-cam   env + camera + collect only (no RTAB/AprilTag/localization)
   collect       save storefront YOLO images while teleop drives
   teleop        keyboard teleop (foreground)
   rviz [name]   rviz on $SLAM_DISPLAY (default apriltag_rtabmap; or: slam rviz yolo)

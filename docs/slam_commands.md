@@ -32,6 +32,7 @@ slam up            # env + arm home + camera + wheel + rtabmap + apriltag + glob
 slam wheel         # command-integrated /wheel/odom only
 slam global-loc    # AprilTag anchor: global_map -> RTAB map
 slam teleop        # drive
+slam collect-cam   # camera-only storefront YOLO frame collection
 slam collect       # save storefront YOLO frames while teleop drives
 slam rviz          # viewer on :1   (slam rviz yolo for the YOLO view)
 slam odom-viz      # RTAB odom path in green, wheel odom path in red
@@ -213,16 +214,23 @@ rostopic echo -n1 /detected_objects                # names + confidence + pose
 ## 4b. Storefront YOLO data collection
 
 This collects RGB images for training a storefront/signboard detector while the
-robot is driven manually. Start the camera stack first, then run the collector
-and teleop in separate terminals:
+robot is driven manually. For battery-limited collection, use the camera-only
+path; it does **not** start RTAB-Map, AprilTag detection, wheel odometry, or the
+localization manager:
 
 ```bash
 source ~/catkin_ws/src/slam/scripts/slam_aliases.sh
-slam up
-slam collect
+slam collect-cam
 
 # another real keyboard terminal:
 slam teleop
+```
+
+Equivalent manual steps:
+```bash
+slam env
+slam cam
+slam collect
 ```
 
 Default output:
@@ -240,10 +248,11 @@ SLAM_STORE_YOLO_SESSION=aisle_slow_01 slam collect
 SLAM_STORE_YOLO_RAW=/media/usb/storefront_raw slam collect
 ```
 
-The collector subscribes to `/camera/color/image_raw` and stores the latest
-`/odom` pose in `metadata.csv` when available. It samples by time plus movement
-gating, so slow teleop produces less duplicate data. Label the images in CVAT
-with class `storefront`, export as YOLO, then use
+The collector subscribes to `/camera/color/image_raw`. If `/odom` exists, it
+also stores the latest pose in `metadata.csv`; without `/odom`, pose columns are
+left blank and collection still works. It samples by time plus optional movement
+gating, so slow teleop produces less duplicate data when odom is available.
+Label the images in CVAT with class `storefront`, export as YOLO, then use
 `training/storefront_yolo/prepare_cvat_yolo.py` and
 `training/storefront_yolo/train_yolo.py` on the GPU server.
 

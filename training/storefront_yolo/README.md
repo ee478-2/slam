@@ -36,8 +36,7 @@ On the Jetson:
 
 ```bash
 source ~/catkin_ws/src/slam/scripts/slam_aliases.sh
-slam up
-slam collect
+slam collect-cam
 ```
 
 In another real terminal:
@@ -62,6 +61,11 @@ SLAM_STORE_YOLO_HZ=1.0 slam collect
 SLAM_STORE_YOLO_SESSION=aisle_slow_01 slam collect
 SLAM_STORE_YOLO_RAW=/media/usb/storefront_raw slam collect
 ```
+
+`slam collect-cam` starts only ROS environment setup, the D435 camera, and the
+image collector. It does not start RTAB-Map, AprilTag detection, wheel odometry,
+or the localization manager. If `/odom` is not running, the collector still
+saves frames and leaves the odometry metadata columns blank.
 
 Capture guidance:
 
