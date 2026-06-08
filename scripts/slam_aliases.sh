@@ -77,11 +77,13 @@ slam() {
     global-loc|global_loc)
            local stable_frames="${SLAM_APRILTAG_MIN_STABLE_FRAMES:-3}"
            local smoothing_window="${SLAM_APRILTAG_SMOOTHING_WINDOW:-5}"
+           local side_weight="${SLAM_APRILTAG_SIDE_WEIGHT:-0.25}"
            setsid roslaunch slam apriltag_global_localization.launch \
              min_stable_frames:="$stable_frames" \
              smoothing_window_size:="$smoothing_window" \
+             side_axis_weight:="$side_weight" \
              >/tmp/global_loc.log 2>&1 & \
-             echo "apriltag global localization (global_map->map, stable frames=$stable_frames, smoothing window=$smoothing_window) -> /tmp/global_loc.log" ;;
+             echo "apriltag global localization (global_map->map, stable frames=$stable_frames, smoothing window=$smoothing_window, side weight=$side_weight) -> /tmp/global_loc.log" ;;
 
     loc)   # localization_manager: fuses tag/rtabmap pose -> /robot_pose + /odom
            setsid roslaunch slam localization_manager.launch >/tmp/locman.log 2>&1 & \

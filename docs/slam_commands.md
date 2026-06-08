@@ -239,14 +239,14 @@ rosrun tf tf_echo global_map map
 
 When a known signboard bundle is visible, the node matches the detected
 `/tag_detections.id` values back to the owning `SIGNBOARDxx` in
-`config/global_map.yaml`, solves the planar `global_map -> map` transform that
-places the observed RTAB tag point exactly on that signboard's global x/y point,
-and publishes `/global_localization/robot_pose`. The localization manager
-consumes that pose first, so `/odom` and `/robot_pose` are in `global_map` while
-the anchor is fresh; if no tag anchor is available, they fall back to RTAB's
-local odometry frame. `/global_localization/selected_tag` reports the match
-method, tag IDs, `stable_frames`, `min_stable_frames`,
-`smoothing_window_samples`, `smoothing_window_size`, and `anchor_error_m`.
+`config/global_map.yaml`, computes a planar `global_map -> map` anchor, then
+publishes `/global_localization/robot_pose`. The localization manager consumes
+that pose first, so `/odom` and `/robot_pose` are in `global_map` while the
+anchor is fresh; if no tag anchor is available, they fall back to RTAB's local
+odometry frame. `/global_localization/selected_tag` reports the match method,
+tag IDs, `stable_frames`, `min_stable_frames`, `smoothing_window_samples`,
+`smoothing_window_size`, axis-filter fields, `raw_anchor_error_m`, and
+`anchor_error_m`.
 
 Direct `/tag_detections` anchors are stabilized by default: a signboard must be
 seen for `min_stable_frames:=3` consecutive detection frames before it can move
@@ -258,10 +258,17 @@ filtered and yaw uses a circular mean over the latest
 rejection; if a large correction is real and stays consistent for the window, it
 is allowed to update the anchor.
 
+After smoothing, anchor updates are filtered in the signboard's planar axes:
+the signboard front/normal direction is trusted at `front_axis_weight:=1.0`,
+while the side/tangent direction is damped by `side_axis_weight:=0.25`. This
+does not reject side corrections; it makes them converge more slowly when they
+remain consistent across frames.
+
 Tune the shortcut with:
 
 ```bash
-SLAM_APRILTAG_MIN_STABLE_FRAMES=5 SLAM_APRILTAG_SMOOTHING_WINDOW=7 slam global-loc
+SLAM_APRILTAG_MIN_STABLE_FRAMES=5 SLAM_APRILTAG_SMOOTHING_WINDOW=7 \
+  SLAM_APRILTAG_SIDE_WEIGHT=0.15 slam global-loc
 ```
 
 ---
