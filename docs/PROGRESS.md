@@ -14,6 +14,9 @@ this file stays an index + current open items.** Newest first.
 - **AprilTag global localization verification** — `a6783dd` wires
   `global_map -> map` and global `/odom` when known signboard tags are visible;
   needs live robot validation against real tag observations.
+- **YOLO pose RTAB landmark validation** — `6208574` publishes 15 cm square-tag
+  YOLO keypoints as RTAB-compatible landmarks; needs live validation of
+  `pose_best.pt`, class-to-tag ID mapping, and RTAB landmark registration.
 - **Loop closure via tag re-observation** — not yet captured (drive back to a seen tag).
 - **Wheel odometry calibration / true encoders** — `/wheel/odom` now exists as
   command-integrated odom; chassis still publishes no encoder/tick feedback.
@@ -25,6 +28,9 @@ this file stays an index + current open items.** Newest first.
 ## Log index
 
 ### 2026-06 — real-robot `slam` → [`docs/progress/2026-06.md`](progress/2026-06.md)
+- **2026-06-09** YOLO pose RTAB landmarks — `6208574` · publishes 15 cm
+  square-tag YOLO keypoints as RTAB-compatible landmarks with 3-frame gating,
+  EMA smoothing, and horizontal-weighted pose for occluded vertical labels.
 - **2026-06-08** Revert AprilTag front/side weighting — `0c822dc` · removes
   side-axis damping after it degraded localization; k-frame + smoothing remain.
 - **2026-06-08** AprilTag front/side anchor weighting — `a87230e` · trusts
