@@ -15,7 +15,8 @@ this file stays an index + current open items.** Newest first.
   `global_map -> map` and global `/odom` when known signboard tags are visible;
   needs live robot validation against real tag observations.
 - **YOLO pose RTAB landmark validation** — `6208574` publishes 15 cm square-tag
-  YOLO keypoints as RTAB-compatible landmarks; needs live validation of
+  YOLO keypoints as RTAB-compatible landmarks; `ffd2087` adds soft
+  `store1..store8` global-map status mapping. Needs live validation of
   `pose_best.pt`, class-to-tag ID mapping, and RTAB landmark registration.
 - **Loop closure via tag re-observation** — not yet captured (drive back to a seen tag).
 - **Wheel odometry calibration / true encoders** — `/wheel/odom` now exists as
@@ -28,6 +29,9 @@ this file stays an index + current open items.** Newest first.
 ## Log index
 
 ### 2026-06 — real-robot `slam` → [`docs/progress/2026-06.md`](progress/2026-06.md)
+- **2026-06-09** YOLO soft global-map store mapping — `ffd2087` · maps
+  `store1..store8` to `global_map.yaml` store order in detector status only;
+  YOLO global anchoring remains disabled by default.
 - **2026-06-09** YOLO pose RTAB landmarks — `6208574` · publishes 15 cm
   square-tag YOLO keypoints as RTAB-compatible landmarks with 3-frame gating,
   EMA smoothing, and horizontal-weighted pose for occluded vertical labels.
