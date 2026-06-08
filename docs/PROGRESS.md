@@ -25,6 +25,10 @@ this file stays an index + current open items.** Newest first.
 ## Log index
 
 ### 2026-06 — real-robot `slam` → [`docs/progress/2026-06.md`](progress/2026-06.md)
+- **2026-06-08** RTAB DB capture guidance — `cfce332` · documents
+  multi-pass reference DB capture and when to rebuild the DB.
+- **2026-06-08** RTAB AprilTag landmark variance — `d0fd7a8` · raises
+  tag translation variance to `0.005` while keeping rotation ignored.
 - **2026-06-08** AprilTag anchor smoothing — `e1b717d` · adds
   short-window median/circular-mean smoothing without hard jump rejection.
 - **2026-06-08** AprilTag anchor stabilization — `cc64563` · requires
