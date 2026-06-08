@@ -157,7 +157,7 @@
   <arg name="gps_topic"                default="/gps/fix" />         <!-- gps async subscription -->
 
   <arg name="tag_topic"                default="/tag_detections" />  <!-- apriltags async subscription -->
-  <arg name="tag_linear_variance"      default="0.0001" />
+  <arg name="tag_linear_variance"      default="0.005" />
   <arg name="tag_angular_variance"     default="9999" />             <!-- >=9999 means ignore rotation in optimization, when rotation estimation of the tag is not reliable -->
   <arg name="fiducial_topic"           default="/fiducial_transforms" />  <!-- aruco_detect async subscription, use tag_linear_variance and tag_angular_variance to set covriance -->
 

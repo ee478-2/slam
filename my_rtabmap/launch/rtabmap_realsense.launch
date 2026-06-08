@@ -41,7 +41,8 @@
   <arg name="odom_guess_frame_id"        default=""/>
   <arg name="odom_guess_min_translation" default="0"/>
   <arg name="odom_guess_min_rotation"    default="0"/>
-  <arg name="launch_realsense" default="false"/>
+  <arg name="tag_linear_variance"        default="0.005"/>
+  <arg name="launch_realsense"           default="false"/>
 
   <!-- Robot/camera frames + the base_link->camera_link mount, matching
        manipulation_control/launch/object_detection_system.launch so SLAM, nav
@@ -103,6 +104,7 @@
     <arg name="odom_guess_frame_id"        value="$(arg odom_guess_frame_id)"/>
     <arg name="odom_guess_min_translation" value="$(arg odom_guess_min_translation)"/>
     <arg name="odom_guess_min_rotation"    value="$(arg odom_guess_min_rotation)"/>
+    <arg name="tag_linear_variance"      value="$(arg tag_linear_variance)"/>
     <arg name="rtabmap_viz"       value="$(arg rtabmap_viz)"/>
     <arg name="rviz"              value="$(arg rviz)"/>
     <arg name="localization"      value="$(arg localization)"/>

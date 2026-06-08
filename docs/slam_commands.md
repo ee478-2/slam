@@ -194,6 +194,8 @@ setsid roslaunch slam apriltag_realsense.launch > /tmp/apriltag.log 2>&1 &
 - Publishes `/tag_detections` (+ `/tag_detections_image`). `rtabmap_realsense.launch`
   already subscribes `/tag_detections` and adds tags as **graph landmarks**
   (landmark graph id = `-(tag_id)`; poses on `/rtabmap/landmarks`, frame `map`).
+  Landmark translation variance defaults to `tag_linear_variance:=0.005`;
+  rotation remains ignored with RTAB-Map's `tag_angular_variance:=9999`.
 - Check detections + landmark registration:
 ```bash
 python3 - <<'PY'
