@@ -18,6 +18,7 @@ import threading
 import cv2
 import numpy as np
 import rospy
+import yaml
 from apriltag_ros.msg import AprilTagDetection, AprilTagDetectionArray
 from cv_bridge import CvBridge
 from sensor_msgs.msg import CameraInfo, Image
@@ -36,6 +37,15 @@ def default_model_path():
         except Exception:
             pass
     return os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "pose_best.pt"))
+
+
+def default_global_map_yaml():
+    if rospkg is not None:
+        try:
+            return os.path.join(rospkg.RosPack().get_path("slam"), "config", "global_map.yaml")
+        except Exception:
+            pass
+    return os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "config", "global_map.yaml"))
 
 
 def get_bool_param(name, default=False):
@@ -166,6 +176,12 @@ class YoloPoseTagDetector:
         self.debug_topic = rospy.get_param(
             "~debug_topic", "/yolo_pose_tag_detector/status"
         )
+        self.global_map_yaml = os.path.expanduser(
+            rospy.get_param("~global_map_yaml", default_global_map_yaml())
+        )
+        self.publish_global_store_status = get_bool_param(
+            "~publish_global_store_status", True
+        )
         self.tag_size_m = float(rospy.get_param("~tag_size_m", 0.15))
         self.base_tag_id = int(rospy.get_param("~base_tag_id", 1000))
         self.class_id_to_tag_id = parse_class_id_map(
@@ -218,6 +234,7 @@ class YoloPoseTagDetector:
         self.track_state = {}
 
         self.object_points = self._make_square_object_points()
+        self.global_store_by_class_id = self.load_global_store_order()
         self.det_pub = rospy.Publisher(
             self.output_topic, AprilTagDetectionArray, queue_size=5
         )
@@ -225,6 +242,7 @@ class YoloPoseTagDetector:
 
         from ultralytics import YOLO
         self.model = YOLO(self.model_path)
+        self.class_names = getattr(self.model.model, "names", {}) or {}
 
         rospy.Subscriber(
             self.camera_info_topic, CameraInfo, self.on_camera_info, queue_size=1
@@ -247,6 +265,39 @@ class YoloPoseTagDetector:
             [-half, half, 0.0],
         ], dtype=np.float32)
         return canonical
+
+    def load_global_store_order(self):
+        if not self.publish_global_store_status:
+            return {}
+        try:
+            with open(self.global_map_yaml, "r") as f:
+                data = yaml.safe_load(f) or {}
+        except Exception as exc:
+            rospy.logwarn(
+                "[yolo_pose_tag_detector] cannot load global map %s: %s",
+                self.global_map_yaml, exc,
+            )
+            return {}
+
+        mapping = {}
+        for offset, store in enumerate(data.get("stores") or [], start=1):
+            try:
+                mapping[offset] = {
+                    "id": str(store["id"]),
+                    "category": str(store.get("category", "")),
+                    "x": float(store["x"]),
+                    "y": float(store["y"]),
+                }
+            except (KeyError, TypeError, ValueError):
+                rospy.logwarn(
+                    "[yolo_pose_tag_detector] skip invalid global store entry: %s",
+                    store,
+                )
+        rospy.loginfo(
+            "[yolo_pose_tag_detector] loaded %d global store mappings from %s",
+            len(mapping), self.global_map_yaml,
+        )
+        return mapping
 
     def on_camera_info(self, msg):
         with self.camera_lock:
@@ -338,6 +389,8 @@ class YoloPoseTagDetector:
             )
             if candidate is None:
                 continue
+            candidate["class_name"] = str(self.class_names.get(cls_id, cls_id))
+            candidate["global_store"] = self.global_store_by_class_id.get(cls_id)
             previous = candidates_by_tag.get(tag_id)
             if previous is None or candidate["score"] > previous["score"]:
                 candidates_by_tag[tag_id] = candidate
@@ -485,6 +538,16 @@ class YoloPoseTagDetector:
                 "horizontal_pairs": candidate.get("horizontal_pairs", 0),
                 "score": round(candidate["score"], 4),
             }
+            if "class_name" in candidate:
+                track_status["class_name"] = candidate["class_name"]
+            if candidate.get("global_store"):
+                store = candidate["global_store"]
+                track_status["global_map_id"] = store["id"]
+                track_status["global_category"] = store["category"]
+                track_status["global_xy"] = [
+                    round(store["x"], 4),
+                    round(store["y"], 4),
+                ]
             status["tracks"].append(track_status)
             if state["count"] < self.min_stable_frames:
                 continue

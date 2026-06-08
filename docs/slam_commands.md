@@ -219,6 +219,10 @@ Defaults:
 - Output topic is `/tag_detections`, so RTAB sees these as normal landmarks.
 - Tag IDs default to `1000 + yolo_class_id`, avoiding collisions with physical
   AprilTag IDs `1..28`.
+- `store1..store8` are softly mapped to the `stores:` entries in
+  `config/global_map.yaml` in the same order. This appears only in
+  `/yolo_pose_tag_detector/status` as `global_map_id`, `global_category`, and
+  `global_xy`; it does not move `global_map -> map`.
 - The same physical square must keep the same class/tag ID over time. If the
   model has one class but multiple physical square tags, RTAB will collapse them
   into one landmark; train/use per-tag classes or set
@@ -240,6 +244,10 @@ RTAB-Map's AprilTag subscriber can also apply its global
 `tag_linear_variance` parameter depending on version/configuration. The pose
 itself is still horizontal-weighted, so the vertical-label caveat is not relying
 only on covariance propagation.
+
+Global-frame anchoring remains AprilTag-first. `slam global-loc` deliberately
+does not use YOLO store IDs `1001..1008` to publish `global_map -> map` by
+default; those detections are soft RTAB landmarks plus debug metadata only.
 
 Useful overrides:
 ```bash
@@ -313,6 +321,10 @@ filtered and yaw uses a circular mean over the latest
 `smoothing_window_size:=5` samples. This intentionally does not add hard jump
 rejection; if a large correction is real and stays consistent for the window, it
 is allowed to update the anchor.
+
+YOLO store detections are not global anchors in the default launch, even though
+they share `/tag_detections`; only IDs configured as AprilTag signboard tags in
+`global_map.yaml` can move `global_map -> map`.
 
 Tune the shortcut with:
 

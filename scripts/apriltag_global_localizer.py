@@ -289,6 +289,21 @@ class AprilTagGlobalLocalizer:
         self.apply_legacy_orientation_correction = get_bool_param(
             "~apply_legacy_orientation_correction", True
         )
+        self.enable_yolo_store_anchors = get_bool_param(
+            "~enable_yolo_store_anchors", False
+        )
+        self.yolo_store_tag_id_base = int(
+            rospy.get_param("~yolo_store_tag_id_base", 1000)
+        )
+        self.yolo_store_class_start = int(
+            rospy.get_param("~yolo_store_class_start", 1)
+        )
+        self.yolo_store_default_z = float(
+            rospy.get_param("~yolo_store_default_z", 0.365)
+        )
+        self.yolo_store_yaw_offset = float(
+            rospy.get_param("~yolo_store_yaw_offset", 0.0)
+        )
 
         if self.global_frame == self.rtabmap_frame:
             raise rospy.ROSException("global_frame and rtabmap_frame must be different")
@@ -324,7 +339,7 @@ class AprilTagGlobalLocalizer:
         )
 
         rospy.loginfo(
-            "[apriltag_global_localizer] loaded %d signboards / %d tag ids from %s; detections=%s; publishing %s -> %s planar=%s stable_frames=%d smoothing_window=%d",
+            "[apriltag_global_localizer] loaded %d global landmarks / %d detection ids from %s; detections=%s; publishing %s -> %s planar=%s stable_frames=%d smoothing_window=%d",
             len(self.known_tags), len(self.tag_to_signboard), self.global_map_yaml,
             self.tag_detections_topic, self.global_frame, self.rtabmap_frame,
             self.constrain_to_planar, self.min_stable_frames,
@@ -363,10 +378,39 @@ class AprilTagGlobalLocalizer:
                         name,
                     )
 
+        if self.enable_yolo_store_anchors:
+            for offset, store in enumerate(data.get("stores") or []):
+                class_id = self.yolo_store_class_start + offset
+                tag_id = self.yolo_store_tag_id_base + class_id
+                try:
+                    name = str(store.get("id") or "store%d" % class_id)
+                    x = float(store["x"])
+                    y = float(store["y"])
+                    z = float(store.get("z", self.yolo_store_default_z))
+                    if "yaw_deg" in store:
+                        yaw = math.radians(float(store["yaw_deg"]))
+                    else:
+                        yaw = float((store.get("visit_offset") or {}).get("yaw", 0.0))
+                    yaw += self.yolo_store_yaw_offset
+                except (KeyError, TypeError, ValueError):
+                    rospy.logwarn(
+                        "[apriltag_global_localizer] skip invalid YOLO store landmark: %s",
+                        store,
+                    )
+                    continue
+                if tag_id in tag_to_signboard:
+                    rospy.logwarn(
+                        "[apriltag_global_localizer] skip YOLO store %s; detection id %d is already mapped to %s",
+                        name, tag_id, tag_to_signboard[tag_id],
+                    )
+                    continue
+                known[name] = Transform((x, y, z), yaw_quat(yaw))
+                tag_to_signboard[tag_id] = name
+
         if not known:
-            raise rospy.ROSException("No signboard poses loaded from %s" % path)
+            raise rospy.ROSException("No global landmark poses loaded from %s" % path)
         if not tag_to_signboard:
-            raise rospy.ROSException("No signboard tag ids loaded from %s" % path)
+            raise rospy.ROSException("No detection ids loaded from %s" % path)
         return known, tag_to_signboard
 
     def detection_signboard_id(self, tag_ids):
@@ -388,7 +432,7 @@ class AprilTagGlobalLocalizer:
             if signboard_id is None:
                 rospy.logwarn_throttle(
                     5.0,
-                    "[apriltag_global_localizer] skip detection ids=%s; no unique signboard match",
+                    "[apriltag_global_localizer] skip detection ids=%s; no unique global landmark match",
                     tag_ids,
                 )
                 continue
