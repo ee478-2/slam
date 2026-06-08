@@ -83,6 +83,12 @@ def quat_to_yaw(q):
     return math.atan2(siny, cosy)
 
 
+def pose_yaw_radians(pose):
+    if "yaw_deg" in pose:
+        return math.radians(float(pose.get("yaw_deg", 0.0)))
+    return float(pose.get("yaw", 0.0))
+
+
 def default_global_map_yaml():
     if rospkg is not None:
         try:
@@ -149,7 +155,8 @@ class MissionVizPublisher:
         rospy.Timer(rospy.Duration.from_sec(period), self.on_timer)
 
         rospy.loginfo(
-            "[mission_viz] publishing %d stores, %d signboards on %s",
+            "[mission_viz] publishing %d walls, %d stores, %d signboards on %s",
+            len(self.map_data["walls"]),
             len(self.map_data["stores"]),
             len(self.map_data["signboards"]),
             self.marker_topic,
@@ -176,6 +183,27 @@ class MissionVizPublisher:
                     "visited": bool(store.get("visited", False)),
                 }
             )
+
+        walls = []
+        for wall in data.get("walls", []):
+            try:
+                pose = wall.get("pose", {}) or {}
+                size = wall.get("size", {}) or {}
+                height = float(size.get("z", 0.18))
+                walls.append(
+                    {
+                        "id": str(wall["id"]),
+                        "x": float(pose["x"]),
+                        "y": float(pose["y"]),
+                        "z": float(pose.get("z", 0.5 * height)),
+                        "yaw": pose_yaw_radians(pose),
+                        "size_x": float(size["x"]),
+                        "size_y": float(size["y"]),
+                        "size_z": height,
+                    }
+                )
+            except (KeyError, TypeError, ValueError) as exc:
+                rospy.logwarn("[mission_viz] skipping invalid wall: %s", exc)
 
         signboards = []
         for signboard_id, signboard in (data.get("signboards", {}) or {}).items():
@@ -205,13 +233,19 @@ class MissionVizPublisher:
 
         return {
             "frame_id": data.get("metadata", {}).get("frame_id", "map"),
+            "walls": walls,
             "stores": stores,
             "signboards": signboards,
         }
 
     def compute_status_anchor(self):
-        xs = [item["x"] for item in self.map_data["stores"] + self.map_data["signboards"]]
-        ys = [item["y"] for item in self.map_data["stores"] + self.map_data["signboards"]]
+        static_items = (
+            self.map_data["walls"]
+            + self.map_data["stores"]
+            + self.map_data["signboards"]
+        )
+        xs = [item["x"] for item in static_items]
+        ys = [item["y"] for item in static_items]
         if not xs or not ys:
             return (-2.8, 2.4, 1.1)
         return (min(xs) - 0.35, max(ys) + 0.35, 1.1)
@@ -270,6 +304,7 @@ class MissionVizPublisher:
 
     def publish_markers(self):
         markers = []
+        markers.extend(self.wall_markers())
         markers.extend(self.store_markers())
         markers.extend(self.signboard_markers())
         markers.extend(self.visible_signboard_markers())
@@ -277,6 +312,36 @@ class MissionVizPublisher:
         markers.extend(self.target_markers())
         markers.extend(self.status_markers())
         self.marker_pub.publish(MarkerArray(markers=markers))
+
+    def wall_markers(self):
+        markers = []
+        for idx, wall in enumerate(self.map_data["walls"]):
+            marker = self.base_marker("walls", 9000 + idx, Marker.CUBE)
+            marker.pose.position.x = wall["x"]
+            marker.pose.position.y = wall["y"]
+            marker.pose.position.z = wall["z"]
+            qz, qw = yaw_to_quaternion(wall["yaw"])
+            marker.pose.orientation.z = qz
+            marker.pose.orientation.w = qw
+            marker.scale.x = wall["size_x"]
+            marker.scale.y = wall["size_y"]
+            marker.scale.z = wall["size_z"]
+            self.set_color(marker, (0.95, 0.12, 0.08, 0.66))
+            markers.append(marker)
+
+            markers.append(
+                self.text_marker(
+                    "wall_labels",
+                    9100 + idx,
+                    wall["x"],
+                    wall["y"],
+                    wall["z"] + 0.5 * wall["size_z"] + 0.12,
+                    wall["id"],
+                    0.095,
+                    (1.0, 0.45, 0.38, 1.0),
+                )
+            )
+        return markers
 
     def store_markers(self):
         markers = []
