@@ -25,6 +25,8 @@ this file stays an index + current open items.** Newest first.
 ## Log index
 
 ### 2026-06 — real-robot `slam` → [`docs/progress/2026-06.md`](progress/2026-06.md)
+- **2026-06-08** AprilTag front/side anchor weighting — `a87230e` · trusts
+  signboard front-axis corrections while damping side-axis corrections.
 - **2026-06-08** RTAB DB capture guidance — `cfce332` · documents
   multi-pass reference DB capture and when to rebuild the DB.
 - **2026-06-08** RTAB AprilTag landmark variance — `d0fd7a8` · raises
