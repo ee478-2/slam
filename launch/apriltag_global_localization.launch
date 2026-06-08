@@ -24,9 +24,6 @@
   <arg name="min_stable_frames" default="3"/>
   <arg name="smoothing_window_size" default="5"/>
   <arg name="stable_max_frame_gap_s" default="0.35"/>
-  <arg name="axis_filter_enabled" default="true"/>
-  <arg name="front_axis_weight" default="1.0"/>
-  <arg name="side_axis_weight" default="0.25"/>
   <arg name="hold_last_transform" default="true"/>
   <arg name="constrain_to_planar" default="true"/>
   <arg name="apply_legacy_orientation_correction" default="true"/>
@@ -45,9 +42,6 @@
     <param name="min_stable_frames" value="$(arg min_stable_frames)"/>
     <param name="smoothing_window_size" value="$(arg smoothing_window_size)"/>
     <param name="stable_max_frame_gap_s" value="$(arg stable_max_frame_gap_s)"/>
-    <param name="axis_filter_enabled" type="bool" value="$(arg axis_filter_enabled)"/>
-    <param name="front_axis_weight" value="$(arg front_axis_weight)"/>
-    <param name="side_axis_weight" value="$(arg side_axis_weight)"/>
     <param name="hold_last_transform" type="bool" value="$(arg hold_last_transform)"/>
     <param name="constrain_to_planar" type="bool" value="$(arg constrain_to_planar)"/>
     <param name="apply_legacy_orientation_correction" type="bool"

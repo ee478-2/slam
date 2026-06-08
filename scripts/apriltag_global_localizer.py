@@ -258,10 +258,6 @@ def stamp_gap_s(newer, older):
     return max(0.0, (newer - older).to_sec())
 
 
-def clamp01(value):
-    return max(0.0, min(1.0, float(value)))
-
-
 class AprilTagGlobalLocalizer:
     def __init__(self):
         rospy.init_node("apriltag_global_localizer", anonymous=False)
@@ -288,13 +284,6 @@ class AprilTagGlobalLocalizer:
         self.stable_max_frame_gap_s = max(
             0.0, float(rospy.get_param("~stable_max_frame_gap_s", 0.35))
         )
-        self.axis_filter_enabled = get_bool_param("~axis_filter_enabled", True)
-        self.front_axis_weight = clamp01(
-            rospy.get_param("~front_axis_weight", 1.0)
-        )
-        self.side_axis_weight = clamp01(
-            rospy.get_param("~side_axis_weight", 0.25)
-        )
         self.hold_last_transform = get_bool_param("~hold_last_transform", True)
         self.constrain_to_planar = get_bool_param("~constrain_to_planar", True)
         self.apply_legacy_orientation_correction = get_bool_param(
@@ -304,11 +293,9 @@ class AprilTagGlobalLocalizer:
         if self.global_frame == self.rtabmap_frame:
             raise rospy.ROSException("global_frame and rtabmap_frame must be different")
 
-        (
-            self.known_tags,
-            self.tag_to_signboard,
-            self.signboard_yaws,
-        ) = self.load_known_signboards(self.global_map_yaml)
+        self.known_tags, self.tag_to_signboard = self.load_known_signboards(
+            self.global_map_yaml
+        )
         self.tf_buffer = tf2_ros.Buffer(cache_time=rospy.Duration(10.0))
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer)
         self.tf_broadcaster = tf2_ros.TransformBroadcaster()
@@ -337,12 +324,11 @@ class AprilTagGlobalLocalizer:
         )
 
         rospy.loginfo(
-            "[apriltag_global_localizer] loaded %d signboards / %d tag ids from %s; detections=%s; publishing %s -> %s planar=%s stable_frames=%d smoothing_window=%d axis_filter=%s front=%.2f side=%.2f",
+            "[apriltag_global_localizer] loaded %d signboards / %d tag ids from %s; detections=%s; publishing %s -> %s planar=%s stable_frames=%d smoothing_window=%d",
             len(self.known_tags), len(self.tag_to_signboard), self.global_map_yaml,
             self.tag_detections_topic, self.global_frame, self.rtabmap_frame,
             self.constrain_to_planar, self.min_stable_frames,
-            self.smoothing_window_size, self.axis_filter_enabled,
-            self.front_axis_weight, self.side_axis_weight,
+            self.smoothing_window_size,
         )
 
     def load_known_signboards(self, path):
@@ -356,7 +342,6 @@ class AprilTagGlobalLocalizer:
         )
         known = {}
         tag_to_signboard = {}
-        signboard_yaws = {}
         for name, item in (data.get("signboards") or {}).items():
             pose = item.get("pose") or {}
             try:
@@ -369,7 +354,6 @@ class AprilTagGlobalLocalizer:
                 continue
             q = quat_multiply(yaw_quat(yaw), correction)
             known[str(name)] = Transform((x, y, z), q)
-            signboard_yaws[str(name)] = yaw
             for tag in item.get("tags", []):
                 try:
                     tag_to_signboard[int(tag["id"])] = str(name)
@@ -383,7 +367,7 @@ class AprilTagGlobalLocalizer:
             raise rospy.ROSException("No signboard poses loaded from %s" % path)
         if not tag_to_signboard:
             raise rospy.ROSException("No signboard tag ids loaded from %s" % path)
-        return known, tag_to_signboard, signboard_yaws
+        return known, tag_to_signboard
 
     def detection_signboard_id(self, tag_ids):
         matches = {
@@ -516,45 +500,6 @@ class AprilTagGlobalLocalizer:
             samples = [item["rtab_from_detection"] for item in window]
 
         return median_planar_transform(samples), len(samples)
-
-    def apply_anchor_axis_filter(self, signboard_id, raw_global_from_rtab):
-        diagnostics = {
-            "axis_filter_applied": False,
-            "axis_filter_front_delta_m": None,
-            "axis_filter_side_delta_m": None,
-        }
-        if (
-            not self.axis_filter_enabled
-            or not self.constrain_to_planar
-            or self.last_global_from_rtab is None
-        ):
-            return raw_global_from_rtab, diagnostics
-
-        yaw = self.signboard_yaws.get(signboard_id)
-        if yaw is None:
-            return raw_global_from_rtab, diagnostics
-
-        previous = self.last_global_from_rtab
-        dx = raw_global_from_rtab.t[0] - previous.t[0]
-        dy = raw_global_from_rtab.t[1] - previous.t[1]
-        front_x = math.cos(yaw)
-        front_y = math.sin(yaw)
-        side_x = -front_y
-        side_y = front_x
-
-        front_delta = dx * front_x + dy * front_y
-        side_delta = dx * side_x + dy * side_y
-        filtered_front = self.front_axis_weight * front_delta
-        filtered_side = self.side_axis_weight * side_delta
-        tx = previous.t[0] + filtered_front * front_x + filtered_side * side_x
-        ty = previous.t[1] + filtered_front * front_y + filtered_side * side_y
-
-        diagnostics.update({
-            "axis_filter_applied": True,
-            "axis_filter_front_delta_m": front_delta,
-            "axis_filter_side_delta_m": side_delta,
-        })
-        return Transform((tx, ty, raw_global_from_rtab.t[2]), raw_global_from_rtab.q), diagnostics
 
     def choose_detection_anchor(self, now):
         with self._lock:
@@ -693,17 +638,11 @@ class AprilTagGlobalLocalizer:
                     stable_count,
                     smoothing_samples,
                 ) = selected
-                raw_global_from_rtab = anchor_transform(
+                global_from_rtab = anchor_transform(
                     global_from_tag, rtab_from_tag, self.constrain_to_planar
-                )
-                global_from_rtab, axis_filter = self.apply_anchor_axis_filter(
-                    tag_name, raw_global_from_rtab
                 )
                 anchor_error_m = planar_point_error(
                     global_from_rtab, global_from_tag, rtab_from_tag
-                )
-                raw_anchor_error_m = planar_point_error(
-                    raw_global_from_rtab, global_from_tag, rtab_from_tag
                 )
                 self.last_global_from_rtab = global_from_rtab
                 self.last_selected = tag_name
@@ -721,30 +660,16 @@ class AprilTagGlobalLocalizer:
                     "min_stable_frames": self.min_stable_frames,
                     "smoothing_window_samples": smoothing_samples,
                     "smoothing_window_size": self.smoothing_window_size,
-                    "axis_filter_applied": axis_filter["axis_filter_applied"],
-                    "front_axis_weight": self.front_axis_weight,
-                    "side_axis_weight": self.side_axis_weight,
-                    "axis_filter_front_delta_m": (
-                        None if axis_filter["axis_filter_front_delta_m"] is None
-                        else round(axis_filter["axis_filter_front_delta_m"], 4)
-                    ),
-                    "axis_filter_side_delta_m": (
-                        None if axis_filter["axis_filter_side_delta_m"] is None
-                        else round(axis_filter["axis_filter_side_delta_m"], 4)
-                    ),
-                    "raw_anchor_error_m": round(raw_anchor_error_m, 4),
                 }, sort_keys=True)))
                 rospy.loginfo_throttle(
                     3.0,
-                    "[apriltag_global_localizer] anchored %s -> %s using %s match=%s ids=%s stable=%s/%d smooth=%s/%d front_w=%.2f side_w=%.2f at %.2fm planar_error=%.3fm raw_error=%.3fm",
+                    "[apriltag_global_localizer] anchored %s -> %s using %s match=%s ids=%s stable=%s/%d smooth=%s/%d at %.2fm planar_error=%.3fm",
                     self.global_frame, self.rtabmap_frame, method, tag_name,
                     tag_ids,
                     stable_count if stable_count is not None else "tf",
                     self.min_stable_frames,
                     smoothing_samples if smoothing_samples is not None else "tf",
-                    self.smoothing_window_size, self.front_axis_weight,
-                    self.side_axis_weight, dist, anchor_error_m,
-                    raw_anchor_error_m,
+                    self.smoothing_window_size, dist, anchor_error_m,
                 )
             elif self.hold_last_transform and self.last_global_from_rtab is not None:
                 self.publish_anchor(self.last_global_from_rtab, now)
