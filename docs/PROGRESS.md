@@ -29,6 +29,9 @@ this file stays an index + current open items.** Newest first.
 ## Log index
 
 ### 2026-06 — real-robot `slam` → [`docs/progress/2026-06.md`](progress/2026-06.md)
+- **2026-06-09** YOLO pose detection visualization — `99c209a` · adds
+  `/yolo_pose_tag_detector/debug_image` overlay for keypoints, horizontal edges,
+  confidence, method, and the 3-frame publication gate.
 - **2026-06-09** YOLO soft global-map store mapping — `ffd2087` · maps
   `store1..store8` to `global_map.yaml` store order in detector status only;
   YOLO global anchoring remains disabled by default.
