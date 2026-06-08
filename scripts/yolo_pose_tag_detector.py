@@ -39,6 +39,22 @@ def default_model_path():
     return os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "pose_best.pt"))
 
 
+def resolve_model_path(path):
+    path = os.path.expanduser(path or default_model_path())
+    if os.path.exists(path):
+        return path
+    root, ext = os.path.splitext(path)
+    if ext == ".engine":
+        fallback = root + ".pt"
+        if os.path.exists(fallback):
+            rospy.logwarn(
+                "[yolo_pose_tag_detector] optimized engine missing (%s); falling back to %s",
+                path, fallback,
+            )
+            return fallback
+    return path
+
+
 def default_global_map_yaml():
     if rospkg is not None:
         try:
@@ -165,7 +181,7 @@ class YoloPoseTagDetector:
     def __init__(self):
         rospy.init_node("yolo_pose_tag_detector", anonymous=False)
 
-        self.model_path = os.path.expanduser(
+        self.model_path = resolve_model_path(
             rospy.get_param("~model_path", default_model_path())
         )
         self.image_topic = rospy.get_param("~image_topic", "/camera/color/image_raw")
@@ -176,6 +192,10 @@ class YoloPoseTagDetector:
         self.debug_topic = rospy.get_param(
             "~debug_topic", "/yolo_pose_tag_detector/status"
         )
+        self.debug_image_topic = rospy.get_param(
+            "~debug_image_topic", "/yolo_pose_tag_detector/debug_image"
+        )
+        self.publish_debug_image_enabled = get_bool_param("~publish_debug_image", True)
         self.global_map_yaml = os.path.expanduser(
             rospy.get_param("~global_map_yaml", default_global_map_yaml())
         )
@@ -239,6 +259,9 @@ class YoloPoseTagDetector:
             self.output_topic, AprilTagDetectionArray, queue_size=5
         )
         self.debug_pub = rospy.Publisher(self.debug_topic, String, queue_size=5)
+        self.debug_image_pub = rospy.Publisher(
+            self.debug_image_topic, Image, queue_size=2
+        )
 
         from ultralytics import YOLO
         self.model = YOLO(self.model_path)
@@ -250,8 +273,8 @@ class YoloPoseTagDetector:
         rospy.Subscriber(self.image_topic, Image, self.on_image, queue_size=1)
 
         rospy.loginfo(
-            "[yolo_pose_tag_detector] model=%s output=%s tag_size=%.3fm stable=%d ema=%.2f fallback=%s pnp_horizontal_weight=%.2f",
-            self.model_path, self.output_topic, self.tag_size_m,
+            "[yolo_pose_tag_detector] model=%s output=%s debug_image=%s tag_size=%.3fm stable=%d ema=%.2f fallback=%s pnp_horizontal_weight=%.2f",
+            self.model_path, self.output_topic, self.debug_image_topic, self.tag_size_m,
             self.min_stable_frames, self.ema_alpha,
             self.allow_horizontal_fallback, self.pnp_horizontal_translation_weight,
         )
@@ -333,13 +356,15 @@ class YoloPoseTagDetector:
             return
 
         self.processed_frame += 1
-        candidates = self.detect_candidates(image, msg, camera_info)
+        candidates, overlays = self.detect_candidates(image, msg, camera_info)
         detections, status = self.update_tracks(candidates, msg, camera_info)
+        status["model_detections"] = len(overlays)
         self.det_pub.publish(AprilTagDetectionArray(
             header=msg.header,
             detections=detections,
         ))
         self.debug_pub.publish(String(json.dumps(status, sort_keys=True)))
+        self.publish_debug_overlay(image, overlays, msg.header)
 
     def detect_candidates(self, image, image_msg, camera_info):
         kwargs = {
@@ -351,10 +376,10 @@ class YoloPoseTagDetector:
             kwargs["device"] = self.device
         results = self.model(image, **kwargs)
         if not results:
-            return []
+            return [], []
         result = results[0]
         if result.keypoints is None or result.boxes is None:
-            return []
+            return [], []
 
         keypoints_xy = result.keypoints.xy.cpu().numpy()
         keypoints_conf = (
@@ -376,26 +401,173 @@ class YoloPoseTagDetector:
         camera_matrix = np.array(camera_info.K, dtype=np.float64).reshape((3, 3))
         dist_coeffs = np.array(camera_info.D, dtype=np.float64).reshape((-1, 1))
         candidates_by_tag = {}
+        overlays = []
         for idx, points in enumerate(keypoints_xy):
             cls_id = int(classes[idx])
             tag_id = self.class_id_to_tag_id.get(cls_id, self.base_tag_id + cls_id)
             score = float(box_conf[idx])
+            class_name = str(self.class_names.get(cls_id, cls_id))
+            conf = keypoints_conf[idx]
+            overlay = {
+                "tag_id": int(tag_id),
+                "class_id": int(cls_id),
+                "class_name": class_name,
+                "score": score,
+                "keypoints_xy": np.asarray(points, dtype=float).tolist(),
+                "keypoints_conf": np.asarray(conf, dtype=float).tolist(),
+                "accepted": False,
+                "reason": "low_box_conf",
+            }
             if score < self.min_box_conf:
+                overlays.append(overlay)
                 continue
 
-            conf = keypoints_conf[idx]
             candidate = self.solve_candidate(
                 tag_id, cls_id, score, points, conf, camera_matrix, dist_coeffs
             )
             if candidate is None:
+                overlay["reason"] = "no_pose"
+                overlays.append(overlay)
                 continue
-            candidate["class_name"] = str(self.class_names.get(cls_id, cls_id))
+            candidate["class_name"] = class_name
             candidate["global_store"] = self.global_store_by_class_id.get(cls_id)
+            candidate["keypoints_xy"] = overlay["keypoints_xy"]
+            candidate["keypoints_conf"] = overlay["keypoints_conf"]
+            candidate["box_score"] = score
+            overlay["accepted"] = True
+            overlay["reason"] = "accepted"
+            overlay["method"] = candidate["method"]
+            overlay["horizontal_pairs"] = candidate.get("horizontal_pairs", 0)
+            overlays.append(overlay)
             previous = candidates_by_tag.get(tag_id)
             if previous is None or candidate["score"] > previous["score"]:
                 candidates_by_tag[tag_id] = candidate
 
-        return list(candidates_by_tag.values())
+        return list(candidates_by_tag.values()), overlays
+
+    def publish_debug_overlay(self, image, overlays, header):
+        if not self.publish_debug_image_enabled:
+            return
+        if self.debug_image_pub.get_num_connections() == 0:
+            return
+
+        debug = image.copy()
+        if overlays:
+            for item in overlays:
+                self.draw_overlay_item(debug, item)
+        else:
+            self.draw_label(debug, "no yolo pose detection", (10, 24), (160, 160, 160))
+
+        try:
+            msg = self.bridge.cv2_to_imgmsg(debug, encoding="bgr8")
+            msg.header = header
+            self.debug_image_pub.publish(msg)
+        except Exception as exc:
+            rospy.logwarn_throttle(
+                5.0, "[yolo_pose_tag_detector] debug image publish failed: %s", exc
+            )
+
+    def draw_overlay_item(self, image, item):
+        tag_id = int(item["tag_id"])
+        state = self.track_state.get(tag_id, {})
+        count = int(state.get("count", 0))
+        stable = count >= self.min_stable_frames
+        accepted = bool(item.get("accepted"))
+        color = (40, 220, 80) if stable else (0, 190, 255)
+        if not accepted:
+            color = (60, 60, 255)
+
+        points = item.get("keypoints_xy") or []
+        confs = item.get("keypoints_conf") or []
+        valid_points = []
+        for index, point in enumerate(points):
+            if len(point) < 2:
+                continue
+            px = float(point[0])
+            py = float(point[1])
+            if not np.isfinite([px, py]).all():
+                continue
+            x = int(round(px))
+            y = int(round(py))
+            conf = float(confs[index]) if index < len(confs) else 1.0
+            valid = conf >= self.min_keypoint_conf
+            if valid:
+                valid_points.append((index, x, y))
+                cv2.circle(image, (x, y), 4, color, -1, lineType=cv2.LINE_AA)
+                cv2.circle(image, (x, y), 7, (0, 0, 0), 1, lineType=cv2.LINE_AA)
+                cv2.putText(
+                    image, str(index), (x + 5, y - 5), cv2.FONT_HERSHEY_SIMPLEX,
+                    0.42, color, 1, cv2.LINE_AA,
+                )
+            elif 0 <= x < image.shape[1] and 0 <= y < image.shape[0]:
+                cv2.drawMarker(
+                    image, (x, y), (60, 60, 255), markerType=cv2.MARKER_TILTED_CROSS,
+                    markerSize=10, thickness=1, line_type=cv2.LINE_AA,
+                )
+
+        valid_by_index = {index: (x, y) for index, x, y in valid_points}
+        for left_idx, right_idx in self.horizontal_pairs:
+            if left_idx in valid_by_index and right_idx in valid_by_index:
+                cv2.line(
+                    image, valid_by_index[left_idx], valid_by_index[right_idx],
+                    color, 2, lineType=cv2.LINE_AA,
+                )
+
+        ordered = [
+            valid_by_index[idx] for idx in self.keypoint_order
+            if idx in valid_by_index
+        ]
+        if len(ordered) == len(self.keypoint_order):
+            cv2.polylines(
+                image, [np.asarray(ordered, dtype=np.int32)], True,
+                color, 1, lineType=cv2.LINE_AA,
+            )
+
+        label = self.overlay_label(item, count, stable)
+        if valid_points:
+            x0 = min(x for _index, x, _y in valid_points)
+            y0 = min(y for _index, _x, y in valid_points) - 10
+            anchor = (max(6, x0), max(18, y0))
+        else:
+            anchor = (10, 24)
+        self.draw_label(image, label, anchor, color)
+
+    def overlay_label(self, item, count, stable):
+        class_name = item.get("class_name", item.get("class_id", "?"))
+        method = str(item.get("method") or item.get("reason") or "?")
+        method = {
+            "pnp4_horizontal_weighted": "pnp4+h",
+            "horizontal_width": "width",
+            "low_box_conf": "low_box",
+        }.get(method, method)
+        state = "pub" if stable else "wait"
+        return "%s id=%s %d/%d %s %.2f %s" % (
+            class_name,
+            item.get("tag_id", "?"),
+            count,
+            self.min_stable_frames,
+            state,
+            float(item.get("score", 0.0)),
+            method,
+        )
+
+    @staticmethod
+    def draw_label(image, text, anchor, color):
+        x, y = anchor
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        scale = 0.45
+        thickness = 1
+        (w, h), baseline = cv2.getTextSize(text, font, scale, thickness)
+        x = min(max(0, int(x)), max(0, image.shape[1] - w - 8))
+        y = min(max(h + 4, int(y)), max(h + 4, image.shape[0] - 4))
+        cv2.rectangle(
+            image,
+            (x - 3, y - h - 4),
+            (x + w + 3, y + baseline + 3),
+            (0, 0, 0),
+            -1,
+        )
+        cv2.putText(image, text, (x, y), font, scale, color, thickness, cv2.LINE_AA)
 
     def solve_candidate(self, tag_id, cls_id, box_score, points, conf, camera_matrix, dist_coeffs):
         valid = np.asarray(conf) >= self.min_keypoint_conf

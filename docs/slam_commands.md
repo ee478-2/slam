@@ -215,8 +215,17 @@ slam rtab
 slam yolo-tags
 ```
 
+Visualize the detector overlay:
+```bash
+rqt_image_view /yolo_pose_tag_detector/debug_image
+```
+
 Defaults:
 - Output topic is `/tag_detections`, so RTAB sees these as normal landmarks.
+- Debug overlay topic is `/yolo_pose_tag_detector/debug_image`; it draws
+  keypoints, horizontal width edges, tag id, score, and the `3/3` publication
+  gate state.
+- Default model path is `pose_best.pt` through the Ultralytics/PyTorch runtime.
 - Tag IDs default to `1000 + yolo_class_id`, avoiding collisions with physical
   AprilTag IDs `1..28`.
 - `store1..store8` are softly mapped to the `stores:` entries in
@@ -256,6 +265,20 @@ SLAM_YOLO_POSE_HZ=3.0 \
 SLAM_YOLO_POSE_MIN_STABLE_FRAMES=3 \
 SLAM_YOLO_POSE_EMA_ALPHA=0.35 \
 slam yolo-tags
+```
+
+TensorRT remains optional. Build the engine on the Jetson, then override the
+model path explicitly:
+```bash
+cd ~/catkin_ws/src/slam
+python3 training/storefront_yolo/export_yolo.py \
+  --weights pose_best.pt \
+  --format engine \
+  --half \
+  --imgsz 640 \
+  --device 0
+
+SLAM_YOLO_POSE_MODEL=$HOME/catkin_ws/src/slam/pose_best.engine slam yolo-tags
 ```
 
 Stop it with `slam down`, or only that node with:

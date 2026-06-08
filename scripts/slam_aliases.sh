@@ -78,16 +78,20 @@ slam() {
            local model="${SLAM_YOLO_POSE_MODEL:-$SLAM_WS/src/slam/pose_best.pt}"
            local hz="${SLAM_YOLO_POSE_HZ:-5.0}"
            local output="${SLAM_YOLO_POSE_OUTPUT:-/tag_detections}"
+           local debug_image="${SLAM_YOLO_POSE_DEBUG_IMAGE:-/yolo_pose_tag_detector/debug_image}"
+           local publish_debug_image="${SLAM_YOLO_POSE_PUBLISH_DEBUG_IMAGE:-true}"
            local stable_frames="${SLAM_YOLO_POSE_MIN_STABLE_FRAMES:-3}"
            local ema="${SLAM_YOLO_POSE_EMA_ALPHA:-0.35}"
            local class_map="${SLAM_YOLO_POSE_CLASS_ID_TO_TAG_ID:-}"
            setsid roslaunch slam yolo_pose_tag_detector.launch \
              model_path:="$model" inference_hz:="$hz" output_topic:="$output" \
+             debug_image_topic:="$debug_image" publish_debug_image:="$publish_debug_image" \
              min_stable_frames:="$stable_frames" ema_alpha:="$ema" \
              class_id_to_tag_id:="$class_map" >/tmp/yolo_pose_tags.log 2>&1 & \
              echo "yolo pose square tags -> /tmp/yolo_pose_tags.log"
            echo "  model: $model"
-           echo "  output: $output (RTAB consumes /tag_detections by default)" ;;
+           echo "  output: $output (RTAB consumes /tag_detections by default)"
+           echo "  debug image: $debug_image" ;;
 
     global-loc|global_loc)
            local stable_frames="${SLAM_APRILTAG_MIN_STABLE_FRAMES:-3}"

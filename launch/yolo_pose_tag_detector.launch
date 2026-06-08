@@ -12,6 +12,8 @@
   <arg name="camera_info_topic" default="/camera/color/camera_info"/>
   <arg name="output_topic" default="/tag_detections"/>
   <arg name="debug_topic" default="/yolo_pose_tag_detector/status"/>
+  <arg name="debug_image_topic" default="/yolo_pose_tag_detector/debug_image"/>
+  <arg name="publish_debug_image" default="true"/>
   <arg name="global_map_yaml" default="$(find slam)/config/global_map.yaml"/>
   <arg name="publish_global_store_status" default="true"/>
 
@@ -48,6 +50,8 @@
     <param name="camera_info_topic" value="$(arg camera_info_topic)"/>
     <param name="output_topic" value="$(arg output_topic)"/>
     <param name="debug_topic" value="$(arg debug_topic)"/>
+    <param name="debug_image_topic" value="$(arg debug_image_topic)"/>
+    <param name="publish_debug_image" value="$(arg publish_debug_image)"/>
     <param name="global_map_yaml" value="$(arg global_map_yaml)"/>
     <param name="publish_global_store_status" value="$(arg publish_global_store_status)"/>
     <param name="tag_size_m" value="$(arg tag_size_m)"/>
