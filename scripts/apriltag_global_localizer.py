@@ -211,6 +211,18 @@ def get_bool_param(name, default=False):
     return str(value).strip().lower() in ("1", "true", "yes", "on")
 
 
+def stamp_or_now(stamp):
+    if stamp == rospy.Time(0):
+        return rospy.Time.now()
+    return stamp
+
+
+def stamp_gap_s(newer, older):
+    if newer == rospy.Time(0) or older == rospy.Time(0):
+        return 0.0
+    return max(0.0, (newer - older).to_sec())
+
+
 class AprilTagGlobalLocalizer:
     def __init__(self):
         rospy.init_node("apriltag_global_localizer", anonymous=False)
@@ -228,6 +240,12 @@ class AprilTagGlobalLocalizer:
         self.lookup_timeout_s = float(rospy.get_param("~lookup_timeout_s", 0.02))
         self.max_tag_age_s = float(rospy.get_param("~max_tag_age_s", 0.5))
         self.max_tag_distance_m = float(rospy.get_param("~max_tag_distance_m", 2.0))
+        self.min_stable_frames = max(
+            1, int(rospy.get_param("~min_stable_frames", 3))
+        )
+        self.stable_max_frame_gap_s = max(
+            0.0, float(rospy.get_param("~stable_max_frame_gap_s", 0.35))
+        )
         self.hold_last_transform = get_bool_param("~hold_last_transform", True)
         self.constrain_to_planar = get_bool_param("~constrain_to_planar", True)
         self.apply_legacy_orientation_correction = get_bool_param(
@@ -245,6 +263,7 @@ class AprilTagGlobalLocalizer:
         self.tf_broadcaster = tf2_ros.TransformBroadcaster()
         self._lock = threading.Lock()
         self._latest_detections = []
+        self._detection_stability = {}
 
         self.transform_pub = rospy.Publisher(
             "/global_localization/transform", TransformStamped, queue_size=5
@@ -258,6 +277,7 @@ class AprilTagGlobalLocalizer:
 
         self.last_global_from_rtab = None
         self.last_selected = None
+        self._detection_warming_up = False
 
         rospy.Subscriber(
             self.tag_detections_topic, AprilTagDetectionArray, self.on_tag_detections,
@@ -265,10 +285,10 @@ class AprilTagGlobalLocalizer:
         )
 
         rospy.loginfo(
-            "[apriltag_global_localizer] loaded %d signboards / %d tag ids from %s; detections=%s; publishing %s -> %s planar=%s",
+            "[apriltag_global_localizer] loaded %d signboards / %d tag ids from %s; detections=%s; publishing %s -> %s planar=%s stable_frames=%d",
             len(self.known_tags), len(self.tag_to_signboard), self.global_map_yaml,
             self.tag_detections_topic, self.global_frame, self.rtabmap_frame,
-            self.constrain_to_planar,
+            self.constrain_to_planar, self.min_stable_frames,
         )
 
     def load_known_signboards(self, path):
@@ -320,7 +340,8 @@ class AprilTagGlobalLocalizer:
         return next(iter(matches))
 
     def on_tag_detections(self, msg):
-        detections = []
+        frame_stamp = stamp_or_now(msg.header.stamp)
+        detections_by_signboard = {}
         for det in msg.detections:
             tag_ids = [int(tag_id) for tag_id in det.id]
             signboard_id = self.detection_signboard_id(tag_ids)
@@ -342,17 +363,55 @@ class AprilTagGlobalLocalizer:
                 continue
             stamp = det.pose.header.stamp
             if stamp == rospy.Time(0):
-                stamp = msg.header.stamp
-            detections.append({
+                stamp = frame_stamp
+            obs = {
                 "stamp": stamp,
                 "frame_id": frame_id,
                 "signboard_id": signboard_id,
                 "tag_ids": tag_ids,
                 "camera_from_detection": transform_from_pose(det.pose.pose.pose),
-            })
+            }
+            previous = detections_by_signboard.get(signboard_id)
+            if previous is None:
+                detections_by_signboard[signboard_id] = obs
+                continue
+            prev_dist = math.sqrt(sum(v * v for v in previous["camera_from_detection"].t))
+            obs_dist = math.sqrt(sum(v * v for v in obs["camera_from_detection"].t))
+            if obs_dist < prev_dist:
+                detections_by_signboard[signboard_id] = obs
+
+        detections = list(detections_by_signboard.values())
+        seen_signboards = set(detections_by_signboard)
 
         with self._lock:
             self._latest_detections = detections
+            for signboard_id in seen_signboards:
+                obs = detections_by_signboard[signboard_id]
+                stamp = stamp_or_now(obs["stamp"])
+                track = self._detection_stability.get(signboard_id)
+                if track is None:
+                    count = 1
+                elif (
+                    self.stable_max_frame_gap_s <= 0.0
+                    or stamp_gap_s(stamp, track["stamp"]) <= self.stable_max_frame_gap_s
+                ):
+                    count = track["count"] + 1
+                else:
+                    count = 1
+                self._detection_stability[signboard_id] = {
+                    "count": count,
+                    "stamp": stamp,
+                    "tag_ids": obs["tag_ids"],
+                }
+
+            for signboard_id, track in list(self._detection_stability.items()):
+                if signboard_id in seen_signboards:
+                    continue
+                if (
+                    self.stable_max_frame_gap_s > 0.0
+                    and stamp_gap_s(frame_stamp, track["stamp"]) > self.stable_max_frame_gap_s
+                ):
+                    track["count"] = 0
 
     def lookup_transform(self, target_frame, source_frame, timeout_s=None):
         timeout = rospy.Duration(self.lookup_timeout_s if timeout_s is None else timeout_s)
@@ -379,12 +438,30 @@ class AprilTagGlobalLocalizer:
     def choose_detection_anchor(self, now):
         with self._lock:
             detections = list(self._latest_detections)
+            stability = {
+                key: value.copy()
+                for key, value in self._detection_stability.items()
+            }
 
         best = None
+        best_unstable = None
         for obs in detections:
             if self.max_tag_age_s > 0.0 and obs["stamp"] != rospy.Time(0):
                 if (now - obs["stamp"]).to_sec() > self.max_tag_age_s:
                     continue
+
+            stable_state = stability.get(obs["signboard_id"], {})
+            stable_count = int(stable_state.get("count", 0))
+            if stable_count < self.min_stable_frames:
+                unstable = (
+                    stable_count,
+                    obs["signboard_id"],
+                    obs["tag_ids"],
+                )
+                if best_unstable is None or stable_count > best_unstable[0]:
+                    best_unstable = unstable
+                continue
+
             try:
                 _msg, rtab_from_camera = self.lookup_transform(
                     self.rtabmap_frame, obs["frame_id"]
@@ -414,10 +491,18 @@ class AprilTagGlobalLocalizer:
                 rtab_from_detection,
                 "detection",
                 obs["tag_ids"],
+                stable_count,
             )
             if best is None or candidate[0] < best[0]:
                 best = candidate
-        return best
+        if best is None and best_unstable is not None:
+            stable_count, signboard_id, tag_ids = best_unstable
+            rospy.loginfo_throttle(
+                2.0,
+                "[apriltag_global_localizer] waiting for stable %s ids=%s (%d/%d frames)",
+                signboard_id, tag_ids, stable_count, self.min_stable_frames,
+            )
+        return best, best_unstable is not None
 
     def choose_tf_anchor(self, now):
         best = None
@@ -433,15 +518,18 @@ class AprilTagGlobalLocalizer:
                 dist = math.sqrt(sum(v * v for v in rtab_from_tag.t))
             if dist > self.max_tag_distance_m:
                 continue
-            candidate = (dist, tag_name, global_from_tag, rtab_from_tag, "tf", [])
+            candidate = (dist, tag_name, global_from_tag, rtab_from_tag, "tf", [], None)
             if best is None or candidate[0] < best[0]:
                 best = candidate
         return best
 
     def choose_visible_anchor(self, now):
-        detection_anchor = self.choose_detection_anchor(now)
+        detection_anchor, detection_is_warming_up = self.choose_detection_anchor(now)
+        self._detection_warming_up = detection_is_warming_up
         if detection_anchor is not None:
             return detection_anchor
+        if detection_is_warming_up:
+            return None
         return self.choose_tf_anchor(now)
 
     def publish_robot_pose(self, global_from_rtab, stamp):
@@ -468,7 +556,15 @@ class AprilTagGlobalLocalizer:
             now = rospy.Time.now()
             selected = self.choose_visible_anchor(now)
             if selected is not None:
-                dist, tag_name, global_from_tag, rtab_from_tag, method, tag_ids = selected
+                (
+                    dist,
+                    tag_name,
+                    global_from_tag,
+                    rtab_from_tag,
+                    method,
+                    tag_ids,
+                    stable_count,
+                ) = selected
                 global_from_rtab = anchor_transform(
                     global_from_tag, rtab_from_tag, self.constrain_to_planar
                 )
@@ -487,12 +583,16 @@ class AprilTagGlobalLocalizer:
                     "rtabmap_frame": self.rtabmap_frame,
                     "planar": self.constrain_to_planar,
                     "tag_ids": tag_ids,
+                    "stable_frames": stable_count,
+                    "min_stable_frames": self.min_stable_frames,
                 }, sort_keys=True)))
                 rospy.loginfo_throttle(
                     3.0,
-                    "[apriltag_global_localizer] anchored %s -> %s using %s match=%s ids=%s at %.2fm planar_error=%.3fm",
+                    "[apriltag_global_localizer] anchored %s -> %s using %s match=%s ids=%s stable=%s/%d at %.2fm planar_error=%.3fm",
                     self.global_frame, self.rtabmap_frame, method, tag_name,
-                    tag_ids, dist, anchor_error_m,
+                    tag_ids,
+                    stable_count if stable_count is not None else "tf",
+                    self.min_stable_frames, dist, anchor_error_m,
                 )
             elif self.hold_last_transform and self.last_global_from_rtab is not None:
                 self.publish_anchor(self.last_global_from_rtab, now)
@@ -500,6 +600,11 @@ class AprilTagGlobalLocalizer:
                     10.0,
                     "[apriltag_global_localizer] no fresh tag; holding last anchor from %s",
                     self.last_selected or "unknown",
+                )
+            elif self._detection_warming_up:
+                rospy.loginfo_throttle(
+                    2.0,
+                    "[apriltag_global_localizer] visible tag is not stable enough to anchor yet",
                 )
             else:
                 rospy.logwarn_throttle(

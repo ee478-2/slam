@@ -227,7 +227,17 @@ and publishes `/global_localization/robot_pose`. The localization manager
 consumes that pose first, so `/odom` and `/robot_pose` are in `global_map` while
 the anchor is fresh; if no tag anchor is available, they fall back to RTAB's
 local odometry frame. `/global_localization/selected_tag` reports the match
-method, tag IDs, and `anchor_error_m`.
+method, tag IDs, `stable_frames`, `min_stable_frames`, and `anchor_error_m`.
+
+Direct `/tag_detections` anchors are stabilized by default: a signboard must be
+seen for `min_stable_frames:=3` consecutive detection frames before it can move
+`global_map -> map`. While the count is warming up, the node holds the previous
+anchor instead of falling through to a one-frame TF anchor. Tune the shortcut
+with:
+
+```bash
+SLAM_APRILTAG_MIN_STABLE_FRAMES=5 slam global-loc
+```
 
 ---
 

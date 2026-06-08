@@ -21,6 +21,8 @@
   <arg name="lookup_timeout_s" default="0.02"/>
   <arg name="max_tag_age_s" default="0.5"/>
   <arg name="max_tag_distance_m" default="2.0"/>
+  <arg name="min_stable_frames" default="3"/>
+  <arg name="stable_max_frame_gap_s" default="0.35"/>
   <arg name="hold_last_transform" default="true"/>
   <arg name="constrain_to_planar" default="true"/>
   <arg name="apply_legacy_orientation_correction" default="true"/>
@@ -36,6 +38,8 @@
     <param name="lookup_timeout_s" value="$(arg lookup_timeout_s)"/>
     <param name="max_tag_age_s" value="$(arg max_tag_age_s)"/>
     <param name="max_tag_distance_m" value="$(arg max_tag_distance_m)"/>
+    <param name="min_stable_frames" value="$(arg min_stable_frames)"/>
+    <param name="stable_max_frame_gap_s" value="$(arg stable_max_frame_gap_s)"/>
     <param name="hold_last_transform" type="bool" value="$(arg hold_last_transform)"/>
     <param name="constrain_to_planar" type="bool" value="$(arg constrain_to_planar)"/>
     <param name="apply_legacy_orientation_correction" type="bool"
