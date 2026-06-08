@@ -171,6 +171,22 @@ slam teleop
 
 Stop with `slam down`; the DB remains at `$HOME/.ros/storefront_ref.db`.
 
+Multiple mapping passes are OK, and usually better than trying to capture one
+perfect view. For the first pass, use `SLAM_RTAB_RESET=true` to start a clean
+DB. To add more coverage to the same DB later, keep the same camera mount and
+run mapping again with `SLAM_RTAB_RESET=false`:
+
+```bash
+SLAM_RTAB_DB=$HOME/.ros/storefront_ref.db SLAM_RTAB_RESET=false slam rtab-map
+```
+
+Drive slowly, keep adjacent passes visually overlapping, and start additional
+passes from a place the existing DB can recognize. Prefer stable structure:
+walls, storefront frames, fixed signs, corners, and AprilTags. Avoid spending
+mapping time on things likely to move or change, such as people, carts,
+temporary displays, open doors, and seasonal merchandise. If the camera mount
+or signboard/store layout changes significantly, build a new reference DB.
+
 Later, localize against that DB without adding new map nodes:
 ```bash
 source ~/catkin_ws/src/slam/scripts/slam_aliases.sh
