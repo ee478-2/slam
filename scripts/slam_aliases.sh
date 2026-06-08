@@ -43,6 +43,25 @@ slam() {
              echo "rtabmap -> /tmp/rtabmap.log"
            fi ;;
 
+    rtab-map|rtab_map|map-db|map_db)
+           local db="${SLAM_RTAB_DB:-$HOME/.ros/storefront_rtabmap.db}"
+           local reset="${SLAM_RTAB_RESET:-true}"
+           local args="--Reg/Force3DoF true"
+           if [ "$reset" = "true" ] || [ "$reset" = "1" ]; then
+             args="--delete_db_on_start $args"
+           fi
+           setsid roslaunch slam rtabmap_realsense.launch rviz:=false rtabmap_viz:=false \
+             localization:=false database_path:="$db" rtabmap_args:="$args" \
+             >/tmp/rtabmap_map.log 2>&1 &
+           echo "rtabmap mapping DB=$db reset=$reset -> /tmp/rtabmap_map.log" ;;
+
+    rtab-loc|rtab_loc|localize-db|localize_db)
+           local db="${SLAM_RTAB_DB:-$HOME/.ros/storefront_rtabmap.db}"
+           setsid roslaunch slam rtabmap_realsense.launch rviz:=false rtabmap_viz:=false \
+             localization:=true database_path:="$db" \
+             rtabmap_args:="--Reg/Force3DoF true" >/tmp/rtabmap_loc.log 2>&1 &
+           echo "rtabmap localization DB=$db -> /tmp/rtabmap_loc.log" ;;
+
     wheel|wheel-odom|wheel_odom)
            setsid roslaunch slam wheel_odom.launch >/tmp/wheel_odom.log 2>&1 & \
              echo "wheel odom (/wheel/odom, no TF) -> /tmp/wheel_odom.log" ;;
@@ -210,6 +229,8 @@ slam <cmd>:
   global-loc    AprilTag anchor: publish global_map->map + global robot pose
   loc           localization_manager -> /robot_pose + /odom (global if anchored)
   yolo          YOLO object detection
+  rtab-map      build/update RTAB feature DB (SLAM_RTAB_DB, SLAM_RTAB_RESET)
+  rtab-loc      localize against RTAB feature DB without adding map nodes
   collect-cam   env + camera + collect only (no RTAB/AprilTag/localization)
   collect       save storefront YOLO images while teleop drives
   teleop        keyboard teleop (foreground)

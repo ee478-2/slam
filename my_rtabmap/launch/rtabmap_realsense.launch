@@ -26,6 +26,7 @@
   <arg name="rviz"          default="true"/>
   <arg name="rtabmap_viz"   default="false"/>
   <arg name="localization"  default="false"/>
+  <arg name="database_path" default="~/.ros/rtabmap.db"/>
   <!-- Reg/Force3DoF=true: the real robot drives on flat ground, and this
        launch uses frame_id=base_link. Constrain registration to x/y/yaw so
        visual odometry and RTAB optimization do not accumulate roll/pitch/z. -->
@@ -92,6 +93,7 @@
   <include file="$(find rtabmap_launch)/launch/rtabmap.launch">
     <arg name="rtabmap_args"      value="$(arg rtabmap_args)"/>
     <arg name="odom_args"         value="$(arg odom_args)"/>
+    <arg name="database_path"     value="$(arg database_path)"/>
     <arg name="rgb_topic"         value="/camera/color/image_raw"/>
     <arg name="depth_topic"       value="/camera/aligned_depth_to_color/image_raw"/>
     <arg name="camera_info_topic" value="/camera/color/camera_info"/>

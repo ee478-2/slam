@@ -31,6 +31,8 @@ source ~/catkin_ws/src/slam/scripts/slam_aliases.sh   # add to ~/.bashrc to make
 slam up            # env + arm home + camera + wheel + rtabmap + apriltag + global-loc
 slam wheel         # command-integrated /wheel/odom only
 slam global-loc    # AprilTag anchor: global_map -> RTAB map
+slam rtab-map      # build RTAB feature DB for later localization
+slam rtab-loc      # localize against saved RTAB feature DB
 slam teleop        # drive
 slam collect-cam   # camera-only storefront YOLO frame collection
 slam collect       # save storefront YOLO frames while teleop drives
@@ -149,6 +151,38 @@ rostopic echo -n1 /wheel/odom
 - `rtabmap_realsense.launch` now passes through `odom_guess_frame_id`,
   `odom_guess_min_translation`, and `odom_guess_min_rotation` for future motion
   prior experiments; defaults leave RTAB-Map behavior unchanged.
+
+### 2c. RTAB feature-DB workflow without YOLO labels
+
+If labeling storefronts is too expensive, use RTAB-Map itself as the feature
+matcher. The saved artifact is the RTAB database, not a rosbag. A rosbag is only
+needed if you want to replay raw camera data later.
+
+Build a reference visual map:
+```bash
+source ~/catkin_ws/src/slam/scripts/slam_aliases.sh
+slam env
+slam cam
+SLAM_RTAB_DB=$HOME/.ros/storefront_ref.db SLAM_RTAB_RESET=true slam rtab-map
+
+# another terminal:
+slam teleop
+```
+
+Stop with `slam down`; the DB remains at `$HOME/.ros/storefront_ref.db`.
+
+Later, localize against that DB without adding new map nodes:
+```bash
+source ~/catkin_ws/src/slam/scripts/slam_aliases.sh
+slam env
+slam cam
+SLAM_RTAB_DB=$HOME/.ros/storefront_ref.db slam rtab-loc
+```
+
+This gives feature-based place recognition / localization in RTAB's `map` frame.
+It does not identify a semantic store category and it does not by itself align
+RTAB's local map to `global_map`; use AprilTags, a known start pose, or manual
+map alignment for that global anchor.
 
 ---
 
