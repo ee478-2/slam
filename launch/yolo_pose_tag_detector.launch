@@ -1,0 +1,71 @@
+<?xml version="1.0"?>
+<!--
+  YOLO pose square-tag detector for RTAB-Map landmarks.
+
+  The model should output four keypoints for a 15 cm x 15 cm square tag. The
+  node publishes apriltag_ros/AprilTagDetectionArray so RTAB-Map can consume the
+  detections through its existing tag_detections subscriber.
+-->
+<launch>
+  <arg name="model_path" default="$(find slam)/pose_best.pt"/>
+  <arg name="image_topic" default="/camera/color/image_raw"/>
+  <arg name="camera_info_topic" default="/camera/color/camera_info"/>
+  <arg name="output_topic" default="/tag_detections"/>
+  <arg name="debug_topic" default="/yolo_pose_tag_detector/status"/>
+
+  <arg name="tag_size_m" default="0.15"/>
+  <arg name="base_tag_id" default="1000"/>
+  <arg name="class_id_to_tag_id" default=""/>
+  <arg name="keypoint_order" default="0,1,2,3"/>
+  <arg name="horizontal_pairs" default="0,1;3,2"/>
+
+  <arg name="min_box_conf" default="0.35"/>
+  <arg name="min_keypoint_conf" default="0.30"/>
+  <arg name="inference_hz" default="5.0"/>
+  <arg name="imgsz" default="640"/>
+  <arg name="device" default=""/>
+
+  <arg name="min_stable_frames" default="3"/>
+  <arg name="ema_alpha" default="0.35"/>
+  <arg name="allow_horizontal_fallback" default="true"/>
+  <arg name="pnp_horizontal_translation_weight" default="0.80"/>
+
+  <!-- Camera optical frame covariance: x=horizontal image axis, y=vertical image axis, z=depth. -->
+  <arg name="horizontal_linear_variance" default="0.02"/>
+  <arg name="vertical_linear_variance" default="0.15"/>
+  <arg name="depth_linear_variance" default="0.05"/>
+  <arg name="fallback_horizontal_linear_variance" default="0.04"/>
+  <arg name="fallback_vertical_linear_variance" default="0.25"/>
+  <arg name="fallback_depth_linear_variance" default="0.08"/>
+  <arg name="angular_variance" default="9999.0"/>
+
+  <node pkg="slam" type="yolo_pose_tag_detector.py"
+        name="yolo_pose_tag_detector" output="log">
+    <param name="model_path" value="$(arg model_path)"/>
+    <param name="image_topic" value="$(arg image_topic)"/>
+    <param name="camera_info_topic" value="$(arg camera_info_topic)"/>
+    <param name="output_topic" value="$(arg output_topic)"/>
+    <param name="debug_topic" value="$(arg debug_topic)"/>
+    <param name="tag_size_m" value="$(arg tag_size_m)"/>
+    <param name="base_tag_id" value="$(arg base_tag_id)"/>
+    <param name="class_id_to_tag_id" value="$(arg class_id_to_tag_id)"/>
+    <param name="keypoint_order" value="$(arg keypoint_order)"/>
+    <param name="horizontal_pairs" value="$(arg horizontal_pairs)"/>
+    <param name="min_box_conf" value="$(arg min_box_conf)"/>
+    <param name="min_keypoint_conf" value="$(arg min_keypoint_conf)"/>
+    <param name="inference_hz" value="$(arg inference_hz)"/>
+    <param name="imgsz" value="$(arg imgsz)"/>
+    <param name="device" value="$(arg device)"/>
+    <param name="min_stable_frames" value="$(arg min_stable_frames)"/>
+    <param name="ema_alpha" value="$(arg ema_alpha)"/>
+    <param name="allow_horizontal_fallback" value="$(arg allow_horizontal_fallback)"/>
+    <param name="pnp_horizontal_translation_weight" value="$(arg pnp_horizontal_translation_weight)"/>
+    <param name="horizontal_linear_variance" value="$(arg horizontal_linear_variance)"/>
+    <param name="vertical_linear_variance" value="$(arg vertical_linear_variance)"/>
+    <param name="depth_linear_variance" value="$(arg depth_linear_variance)"/>
+    <param name="fallback_horizontal_linear_variance" value="$(arg fallback_horizontal_linear_variance)"/>
+    <param name="fallback_vertical_linear_variance" value="$(arg fallback_vertical_linear_variance)"/>
+    <param name="fallback_depth_linear_variance" value="$(arg fallback_depth_linear_variance)"/>
+    <param name="angular_variance" value="$(arg angular_variance)"/>
+  </node>
+</launch>

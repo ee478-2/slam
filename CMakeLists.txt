@@ -74,6 +74,7 @@ catkin_install_python(PROGRAMS
   scripts/odom_compare_viz.py
   scripts/storefront_dataset_collector.py
   scripts/wheel_odom_node.py
+  scripts/yolo_pose_tag_detector.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 

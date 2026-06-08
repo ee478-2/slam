@@ -31,6 +31,7 @@ source ~/catkin_ws/src/slam/scripts/slam_aliases.sh   # add to ~/.bashrc to make
 slam up            # env + arm home + camera + wheel + rtabmap + apriltag + global-loc
 slam wheel         # command-integrated /wheel/odom only
 slam global-loc    # AprilTag anchor: global_map -> RTAB map
+slam yolo-tags     # YOLO pose square tags as RTAB-compatible landmarks
 slam rtab-map      # build RTAB feature DB for later localization
 slam rtab-loc      # localize against saved RTAB feature DB
 slam teleop        # drive
@@ -43,7 +44,7 @@ slam mon           # 15s map+VO monitor
 slam down          # SIGINT teardown (camera stopped last)
 slam help          # full list
 ```
-Individual steps: `slam env | arm-home | cam | wheel | rtab | tags | global-loc | loc | yolo | collect`.
+Individual steps: `slam env | arm-home | cam | wheel | rtab | tags | yolo-tags | global-loc | loc | yolo | collect`.
 Override the Pi IP / GUI display with `SLAM_PI=...`, `SLAM_DISPLAY=:0` before
 sourcing.
 
@@ -199,6 +200,61 @@ This gives feature-based place recognition / localization in RTAB's `map` frame.
 It does not identify a semantic store category and it does not by itself align
 RTAB's local map to `global_map`; use AprilTags, a known start pose, or manual
 map alignment for that global anchor.
+
+### 2d. YOLO pose square-tag landmarks for RTAB
+
+The YOLO pose model at `$(find slam)/pose_best.pt` can publish square-tag
+detections in the same `apriltag_ros/AprilTagDetectionArray` format RTAB already
+subscribes to. The square is treated as exactly `0.15 m x 0.15 m`:
+
+```bash
+source ~/catkin_ws/src/slam/scripts/slam_aliases.sh
+slam env
+slam cam
+slam rtab
+slam yolo-tags
+```
+
+Defaults:
+- Output topic is `/tag_detections`, so RTAB sees these as normal landmarks.
+- Tag IDs default to `1000 + yolo_class_id`, avoiding collisions with physical
+  AprilTag IDs `1..28`.
+- The same physical square must keep the same class/tag ID over time. If the
+  model has one class but multiple physical square tags, RTAB will collapse them
+  into one landmark; train/use per-tag classes or set
+  `SLAM_YOLO_POSE_CLASS_ID_TO_TAG_ID="0:1000,1:1001"` before `slam yolo-tags`.
+- A detection must survive `SLAM_YOLO_POSE_MIN_STABLE_FRAMES=3` consecutive
+  processed frames before publishing.
+- Published poses are EMA-smoothed with `SLAM_YOLO_POSE_EMA_ALPHA=0.35`.
+
+Vertical keypoint extent is intentionally weak. Even if all four keypoints solve
+PnP, the node biases x/z translation toward the horizontal pixel width
+(`pnp_horizontal_translation_weight=0.80`) and publishes larger covariance on the
+camera optical vertical axis than on the horizontal axis. This matches the
+labeling rule: label the visible vertical part when occluded, but do not let
+RTAB treat that vertical extent as a precise metric. If only one or both
+horizontal edges are visible, the node falls back to width-only translation with
+even larger vertical covariance.
+
+RTAB-Map's AprilTag subscriber can also apply its global
+`tag_linear_variance` parameter depending on version/configuration. The pose
+itself is still horizontal-weighted, so the vertical-label caveat is not relying
+only on covariance propagation.
+
+Useful overrides:
+```bash
+SLAM_YOLO_POSE_MODEL=$HOME/catkin_ws/src/slam/pose_best.pt \
+SLAM_YOLO_POSE_HZ=3.0 \
+SLAM_YOLO_POSE_MIN_STABLE_FRAMES=3 \
+SLAM_YOLO_POSE_EMA_ALPHA=0.35 \
+slam yolo-tags
+```
+
+Stop it with `slam down`, or only that node with:
+```bash
+pkill -INT -f 'roslaunch slam yolo_pose_tag_detector'
+pkill -INT -f 'yolo_pose_tag_detector.py'
+```
 
 ---
 

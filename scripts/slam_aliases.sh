@@ -74,6 +74,21 @@ slam() {
     tags)  setsid roslaunch slam apriltag_realsense.launch >/tmp/apriltag.log 2>&1 & \
              echo "apriltag -> /tmp/apriltag.log" ;;
 
+    yolo-tags|yolo_tags|pose-tags|pose_tags)
+           local model="${SLAM_YOLO_POSE_MODEL:-$SLAM_WS/src/slam/pose_best.pt}"
+           local hz="${SLAM_YOLO_POSE_HZ:-5.0}"
+           local output="${SLAM_YOLO_POSE_OUTPUT:-/tag_detections}"
+           local stable_frames="${SLAM_YOLO_POSE_MIN_STABLE_FRAMES:-3}"
+           local ema="${SLAM_YOLO_POSE_EMA_ALPHA:-0.35}"
+           local class_map="${SLAM_YOLO_POSE_CLASS_ID_TO_TAG_ID:-}"
+           setsid roslaunch slam yolo_pose_tag_detector.launch \
+             model_path:="$model" inference_hz:="$hz" output_topic:="$output" \
+             min_stable_frames:="$stable_frames" ema_alpha:="$ema" \
+             class_id_to_tag_id:="$class_map" >/tmp/yolo_pose_tags.log 2>&1 & \
+             echo "yolo pose square tags -> /tmp/yolo_pose_tags.log"
+           echo "  model: $model"
+           echo "  output: $output (RTAB consumes /tag_detections by default)" ;;
+
     global-loc|global_loc)
            local stable_frames="${SLAM_APRILTAG_MIN_STABLE_FRAMES:-3}"
            local smoothing_window="${SLAM_APRILTAG_SMOOTHING_WINDOW:-5}"
@@ -209,6 +224,8 @@ PY
       pkill -INT -f 'roslaunch slam wheel_odom' 2>/dev/null
       pkill -INT -f 'roslaunch slam storefront_data_collection' 2>/dev/null
       pkill -INT -f 'storefront_dataset_collector.py' 2>/dev/null
+      pkill -INT -f 'roslaunch slam yolo_pose_tag_detector' 2>/dev/null
+      pkill -INT -f 'yolo_pose_tag_detector.py' 2>/dev/null
       pkill -INT -f 'roslaunch slam apriltag_realsense' 2>/dev/null
       pkill -INT -f 'roslaunch slam rtabmap_realsense' 2>/dev/null
       pkill -f 'object_detection.py' 2>/dev/null
@@ -230,6 +247,7 @@ slam <cmd>:
   wheel-tf      /wheel/odom plus wheel_odom->base_link TF (isolated tests)
   rtab          rtabmap RGB-D SLAM
   tags          apriltag detection (+ rtabmap landmarks)
+  yolo-tags     YOLO pose square tags as RTAB-compatible landmarks
   global-loc    AprilTag anchor: publish global_map->map + global robot pose
   loc           localization_manager -> /robot_pose + /odom (global if anchored)
   yolo          YOLO object detection
