@@ -17,6 +17,7 @@ import json
 import math
 import os
 import threading
+from collections import deque
 
 import rospy
 import tf2_ros
@@ -92,6 +93,40 @@ def yaw_from_quat(q):
     return math.atan2(
         2.0 * (w * z + x * y),
         1.0 - 2.0 * (y * y + z * z),
+    )
+
+
+def median(values):
+    ordered = sorted(float(v) for v in values)
+    n = len(ordered)
+    if n == 0:
+        return 0.0
+    mid = n // 2
+    if n % 2:
+        return ordered[mid]
+    return 0.5 * (ordered[mid - 1] + ordered[mid])
+
+
+def circular_mean(angles):
+    if not angles:
+        return 0.0
+    s = sum(math.sin(a) for a in angles)
+    c = sum(math.cos(a) for a in angles)
+    if abs(s) <= 1e-12 and abs(c) <= 1e-12:
+        return angles[-1]
+    return math.atan2(s, c)
+
+
+def median_planar_transform(transforms):
+    if not transforms:
+        return Transform()
+    return Transform(
+        (
+            median(tf.t[0] for tf in transforms),
+            median(tf.t[1] for tf in transforms),
+            median(tf.t[2] for tf in transforms),
+        ),
+        yaw_quat(circular_mean([yaw_from_quat(tf.q) for tf in transforms])),
     )
 
 
@@ -243,6 +278,9 @@ class AprilTagGlobalLocalizer:
         self.min_stable_frames = max(
             1, int(rospy.get_param("~min_stable_frames", 3))
         )
+        self.smoothing_window_size = max(
+            1, int(rospy.get_param("~smoothing_window_size", 5))
+        )
         self.stable_max_frame_gap_s = max(
             0.0, float(rospy.get_param("~stable_max_frame_gap_s", 0.35))
         )
@@ -264,6 +302,7 @@ class AprilTagGlobalLocalizer:
         self._lock = threading.Lock()
         self._latest_detections = []
         self._detection_stability = {}
+        self._anchor_windows = {}
 
         self.transform_pub = rospy.Publisher(
             "/global_localization/transform", TransformStamped, queue_size=5
@@ -285,10 +324,11 @@ class AprilTagGlobalLocalizer:
         )
 
         rospy.loginfo(
-            "[apriltag_global_localizer] loaded %d signboards / %d tag ids from %s; detections=%s; publishing %s -> %s planar=%s stable_frames=%d",
+            "[apriltag_global_localizer] loaded %d signboards / %d tag ids from %s; detections=%s; publishing %s -> %s planar=%s stable_frames=%d smoothing_window=%d",
             len(self.known_tags), len(self.tag_to_signboard), self.global_map_yaml,
             self.tag_detections_topic, self.global_frame, self.rtabmap_frame,
             self.constrain_to_planar, self.min_stable_frames,
+            self.smoothing_window_size,
         )
 
     def load_known_signboards(self, path):
@@ -403,6 +443,8 @@ class AprilTagGlobalLocalizer:
                     "stamp": stamp,
                     "tag_ids": obs["tag_ids"],
                 }
+                if count == 1:
+                    self._anchor_windows.pop(signboard_id, None)
 
             for signboard_id, track in list(self._detection_stability.items()):
                 if signboard_id in seen_signboards:
@@ -412,6 +454,7 @@ class AprilTagGlobalLocalizer:
                     and stamp_gap_s(frame_stamp, track["stamp"]) > self.stable_max_frame_gap_s
                 ):
                     track["count"] = 0
+                    self._anchor_windows.pop(signboard_id, None)
 
     def lookup_transform(self, target_frame, source_frame, timeout_s=None):
         timeout = rospy.Duration(self.lookup_timeout_s if timeout_s is None else timeout_s)
@@ -435,6 +478,29 @@ class AprilTagGlobalLocalizer:
         except Exception:
             return float("inf")
 
+    def update_anchor_window(self, signboard_id, stamp, rtab_from_detection):
+        if self.smoothing_window_size <= 1 or not self.constrain_to_planar:
+            return rtab_from_detection, 1
+
+        sample = {
+            "stamp": stamp_or_now(stamp),
+            "rtab_from_detection": rtab_from_detection,
+        }
+        with self._lock:
+            window = self._anchor_windows.get(signboard_id)
+            if window is None:
+                window = deque(maxlen=self.smoothing_window_size)
+                self._anchor_windows[signboard_id] = window
+
+            if window and window[-1]["stamp"] == sample["stamp"]:
+                window[-1] = sample
+            else:
+                window.append(sample)
+
+            samples = [item["rtab_from_detection"] for item in window]
+
+        return median_planar_transform(samples), len(samples)
+
     def choose_detection_anchor(self, now):
         with self._lock:
             detections = list(self._latest_detections)
@@ -452,15 +518,6 @@ class AprilTagGlobalLocalizer:
 
             stable_state = stability.get(obs["signboard_id"], {})
             stable_count = int(stable_state.get("count", 0))
-            if stable_count < self.min_stable_frames:
-                unstable = (
-                    stable_count,
-                    obs["signboard_id"],
-                    obs["tag_ids"],
-                )
-                if best_unstable is None or stable_count > best_unstable[0]:
-                    best_unstable = unstable
-                continue
 
             try:
                 _msg, rtab_from_camera = self.lookup_transform(
@@ -483,15 +540,30 @@ class AprilTagGlobalLocalizer:
             if dist > self.max_tag_distance_m:
                 continue
 
+            smoothed_rtab_from_detection, smoothing_samples = self.update_anchor_window(
+                obs["signboard_id"], obs["stamp"], rtab_from_detection
+            )
+
+            if stable_count < self.min_stable_frames:
+                unstable = (
+                    stable_count,
+                    obs["signboard_id"],
+                    obs["tag_ids"],
+                )
+                if best_unstable is None or stable_count > best_unstable[0]:
+                    best_unstable = unstable
+                continue
+
             global_from_detection = self.known_tags[obs["signboard_id"]]
             candidate = (
                 dist,
                 obs["signboard_id"],
                 global_from_detection,
-                rtab_from_detection,
+                smoothed_rtab_from_detection,
                 "detection",
                 obs["tag_ids"],
                 stable_count,
+                smoothing_samples,
             )
             if best is None or candidate[0] < best[0]:
                 best = candidate
@@ -518,7 +590,7 @@ class AprilTagGlobalLocalizer:
                 dist = math.sqrt(sum(v * v for v in rtab_from_tag.t))
             if dist > self.max_tag_distance_m:
                 continue
-            candidate = (dist, tag_name, global_from_tag, rtab_from_tag, "tf", [], None)
+            candidate = (dist, tag_name, global_from_tag, rtab_from_tag, "tf", [], None, None)
             if best is None or candidate[0] < best[0]:
                 best = candidate
         return best
@@ -564,6 +636,7 @@ class AprilTagGlobalLocalizer:
                     method,
                     tag_ids,
                     stable_count,
+                    smoothing_samples,
                 ) = selected
                 global_from_rtab = anchor_transform(
                     global_from_tag, rtab_from_tag, self.constrain_to_planar
@@ -585,14 +658,18 @@ class AprilTagGlobalLocalizer:
                     "tag_ids": tag_ids,
                     "stable_frames": stable_count,
                     "min_stable_frames": self.min_stable_frames,
+                    "smoothing_window_samples": smoothing_samples,
+                    "smoothing_window_size": self.smoothing_window_size,
                 }, sort_keys=True)))
                 rospy.loginfo_throttle(
                     3.0,
-                    "[apriltag_global_localizer] anchored %s -> %s using %s match=%s ids=%s stable=%s/%d at %.2fm planar_error=%.3fm",
+                    "[apriltag_global_localizer] anchored %s -> %s using %s match=%s ids=%s stable=%s/%d smooth=%s/%d at %.2fm planar_error=%.3fm",
                     self.global_frame, self.rtabmap_frame, method, tag_name,
                     tag_ids,
                     stable_count if stable_count is not None else "tf",
-                    self.min_stable_frames, dist, anchor_error_m,
+                    self.min_stable_frames,
+                    smoothing_samples if smoothing_samples is not None else "tf",
+                    self.smoothing_window_size, dist, anchor_error_m,
                 )
             elif self.hold_last_transform and self.last_global_from_rtab is not None:
                 self.publish_anchor(self.last_global_from_rtab, now)
