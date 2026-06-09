@@ -32,6 +32,10 @@ except ImportError:
     rospkg = None
 
 
+TAG_PLANE_NORMAL_AXIS = (0.0, 0.0, 1.0)
+MIN_NORMAL_HORIZONTAL_NORM = 1e-6
+
+
 def default_global_map_yaml():
     if rospkg is not None:
         try:
@@ -96,6 +100,14 @@ def yaw_from_quat(q):
     )
 
 
+def normalize_angle(angle):
+    return math.atan2(math.sin(angle), math.cos(angle))
+
+
+def angle_distance(a, b):
+    return abs(normalize_angle(a - b))
+
+
 def median(values):
     ordered = sorted(float(v) for v in values)
     n = len(ordered)
@@ -134,6 +146,26 @@ def rotate_vec(q, v):
     qv = (v[0], v[1], v[2], 0.0)
     r = quat_multiply_raw(quat_multiply_raw(normalize_quat(q), qv), quat_inverse(q))
     return (r[0], r[1], r[2])
+
+
+def tag_plane_normal(q):
+    return rotate_vec(q, TAG_PLANE_NORMAL_AXIS)
+
+
+def normal_horizontal_yaw(q):
+    normal = tag_plane_normal(q)
+    horizontal = math.hypot(normal[0], normal[1])
+    if horizontal <= MIN_NORMAL_HORIZONTAL_NORM:
+        return None
+    return math.atan2(normal[1], normal[0])
+
+
+def closest_angle(candidates, reference):
+    return min(candidates, key=lambda candidate: angle_distance(candidate, reference))
+
+
+def with_planar_yaw(tf, yaw):
+    return Transform(tf.t, yaw_quat(yaw))
 
 
 def legacy_tag_orientation_correction():
@@ -290,6 +322,12 @@ class AprilTagGlobalLocalizer:
         )
         self.hold_last_transform = get_bool_param("~hold_last_transform", True)
         self.constrain_to_planar = get_bool_param("~constrain_to_planar", True)
+        self.use_tag_normal_heading = get_bool_param(
+            "~use_tag_normal_heading", True
+        )
+        self.max_tag_inplane_yaw_correction_deg = float(
+            rospy.get_param("~max_tag_inplane_yaw_correction_deg", 60.0)
+        )
         self.apply_legacy_orientation_correction = get_bool_param(
             "~apply_legacy_orientation_correction", True
         )
@@ -353,11 +391,12 @@ class AprilTagGlobalLocalizer:
             )
 
         rospy.loginfo(
-            "[apriltag_global_localizer] loaded %d global landmarks / %d detection ids from %s; detections=%s; initial_pose=%s enabled=%s; publishing %s -> %s planar=%s stable_frames=%d smoothing_window=%d",
+            "[apriltag_global_localizer] loaded %d global landmarks / %d detection ids from %s; detections=%s; initial_pose=%s enabled=%s; publishing %s -> %s planar=%s normal_heading=%s max_inplane_correction=%.1fdeg stable_frames=%d smoothing_window=%d",
             len(self.known_tags), len(self.tag_to_signboard), self.global_map_yaml,
             self.tag_detections_topic, self.initial_pose_topic,
             self.enable_initial_pose_anchor, self.global_frame, self.rtabmap_frame,
-            self.constrain_to_planar, self.min_stable_frames,
+            self.constrain_to_planar, self.use_tag_normal_heading,
+            self.max_tag_inplane_yaw_correction_deg, self.min_stable_frames,
             self.smoothing_window_size,
         )
 
@@ -565,6 +604,63 @@ class AprilTagGlobalLocalizer:
         except Exception:
             return float("inf")
 
+    def correct_inplane_tag_heading(self, global_from_tag, rtab_from_tag, label):
+        diag = {
+            "heading_source": "tag_euler_yaw",
+            "inplane_yaw_correction_deg": 0.0,
+        }
+        if not self.use_tag_normal_heading or not self.constrain_to_planar:
+            return rtab_from_tag, diag
+
+        global_normal_yaw = normal_horizontal_yaw(global_from_tag.q)
+        observed_normal_yaw = normal_horizontal_yaw(rtab_from_tag.q)
+        if global_normal_yaw is None or observed_normal_yaw is None:
+            diag["heading_source"] = "tag_euler_yaw_no_normal"
+            rospy.logwarn_throttle(
+                2.0,
+                "[apriltag_global_localizer] using Euler yaw for %s; tag normal has no stable horizontal projection",
+                label,
+            )
+            return rtab_from_tag, diag
+
+        euler_anchor_yaw = normalize_angle(
+            yaw_from_quat(global_from_tag.q) - yaw_from_quat(rtab_from_tag.q)
+        )
+        normal_anchor_yaw = closest_angle(
+            (
+                normalize_angle(global_normal_yaw - observed_normal_yaw),
+                normalize_angle(global_normal_yaw - observed_normal_yaw + math.pi),
+            ),
+            euler_anchor_yaw,
+        )
+        correction = normalize_angle(normal_anchor_yaw - euler_anchor_yaw)
+        correction_deg = math.degrees(correction)
+        if (
+            self.max_tag_inplane_yaw_correction_deg > 0.0
+            and abs(correction_deg) > self.max_tag_inplane_yaw_correction_deg
+        ):
+            diag.update({
+                "heading_source": "tag_euler_yaw_normal_rejected",
+                "inplane_yaw_correction_deg": round(correction_deg, 2),
+            })
+            rospy.logwarn_throttle(
+                2.0,
+                "[apriltag_global_localizer] using Euler yaw for %s; normal correction %.1fdeg exceeds %.1fdeg",
+                label,
+                correction_deg,
+                self.max_tag_inplane_yaw_correction_deg,
+            )
+            return rtab_from_tag, diag
+
+        corrected_observed_yaw = normalize_angle(
+            yaw_from_quat(global_from_tag.q) - normal_anchor_yaw
+        )
+        diag.update({
+            "heading_source": "tag_plane_normal",
+            "inplane_yaw_correction_deg": round(correction_deg, 2),
+        })
+        return with_planar_yaw(rtab_from_tag, corrected_observed_yaw), diag
+
     def update_anchor_window(self, signboard_id, stamp, rtab_from_detection):
         if self.smoothing_window_size <= 1 or not self.constrain_to_planar:
             return rtab_from_detection, 1
@@ -621,6 +717,12 @@ class AprilTagGlobalLocalizer:
             rtab_from_detection = compose(
                 rtab_from_camera, obs["camera_from_detection"]
             )
+            global_from_detection = self.known_tags[obs["signboard_id"]]
+            rtab_from_detection, heading_diag = self.correct_inplane_tag_heading(
+                global_from_detection,
+                rtab_from_detection,
+                "%s ids=%s" % (obs["signboard_id"], obs["tag_ids"]),
+            )
             dist = self.distance_to_tag(obs["signboard_id"])
             if not math.isfinite(dist):
                 dist = math.sqrt(sum(v * v for v in obs["camera_from_detection"].t))
@@ -641,7 +743,6 @@ class AprilTagGlobalLocalizer:
                     best_unstable = unstable
                 continue
 
-            global_from_detection = self.known_tags[obs["signboard_id"]]
             candidate = (
                 dist,
                 obs["signboard_id"],
@@ -651,6 +752,7 @@ class AprilTagGlobalLocalizer:
                 obs["tag_ids"],
                 stable_count,
                 smoothing_samples,
+                heading_diag,
             )
             if best is None or candidate[0] < best[0]:
                 best = candidate
@@ -677,7 +779,22 @@ class AprilTagGlobalLocalizer:
                 dist = math.sqrt(sum(v * v for v in rtab_from_tag.t))
             if dist > self.max_tag_distance_m:
                 continue
-            candidate = (dist, tag_name, global_from_tag, rtab_from_tag, "tf", [], None, None)
+            rtab_from_tag, heading_diag = self.correct_inplane_tag_heading(
+                global_from_tag,
+                rtab_from_tag,
+                "%s TF" % tag_name,
+            )
+            candidate = (
+                dist,
+                tag_name,
+                global_from_tag,
+                rtab_from_tag,
+                "tf",
+                [],
+                None,
+                None,
+                heading_diag,
+            )
             if best is None or candidate[0] < best[0]:
                 best = candidate
         return best
@@ -778,6 +895,7 @@ class AprilTagGlobalLocalizer:
                     tag_ids,
                     stable_count,
                     smoothing_samples,
+                    heading_diag,
                 ) = selected
                 global_from_rtab = anchor_transform(
                     global_from_tag, rtab_from_tag, self.constrain_to_planar
@@ -801,16 +919,23 @@ class AprilTagGlobalLocalizer:
                     "min_stable_frames": self.min_stable_frames,
                     "smoothing_window_samples": smoothing_samples,
                     "smoothing_window_size": self.smoothing_window_size,
+                    "heading_source": heading_diag.get("heading_source"),
+                    "inplane_yaw_correction_deg": heading_diag.get(
+                        "inplane_yaw_correction_deg"
+                    ),
                 }, sort_keys=True)))
                 rospy.loginfo_throttle(
                     3.0,
-                    "[apriltag_global_localizer] anchored %s -> %s using %s match=%s ids=%s stable=%s/%d smooth=%s/%d at %.2fm planar_error=%.3fm",
+                    "[apriltag_global_localizer] anchored %s -> %s using %s match=%s ids=%s stable=%s/%d smooth=%s/%d at %.2fm heading=%s correction=%.1fdeg planar_error=%.3fm",
                     self.global_frame, self.rtabmap_frame, method, tag_name,
                     tag_ids,
                     stable_count if stable_count is not None else "tf",
                     self.min_stable_frames,
                     smoothing_samples if smoothing_samples is not None else "tf",
-                    self.smoothing_window_size, dist, anchor_error_m,
+                    self.smoothing_window_size, dist,
+                    heading_diag.get("heading_source"),
+                    heading_diag.get("inplane_yaw_correction_deg", 0.0),
+                    anchor_error_m,
                 )
             elif (
                 initial_pose_anchor is not None

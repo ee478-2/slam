@@ -28,6 +28,8 @@
   <arg name="stable_max_frame_gap_s" default="0.35"/>
   <arg name="hold_last_transform" default="true"/>
   <arg name="constrain_to_planar" default="true"/>
+  <arg name="use_tag_normal_heading" default="true"/>
+  <arg name="max_tag_inplane_yaw_correction_deg" default="60.0"/>
   <arg name="apply_legacy_orientation_correction" default="true"/>
   <!-- Keep YOLO store detections as soft RTAB landmarks by default. Enabling this
        makes YOLO store IDs 1001..1008 hard candidates for global_map->map. -->
@@ -56,6 +58,8 @@
     <param name="stable_max_frame_gap_s" value="$(arg stable_max_frame_gap_s)"/>
     <param name="hold_last_transform" type="bool" value="$(arg hold_last_transform)"/>
     <param name="constrain_to_planar" type="bool" value="$(arg constrain_to_planar)"/>
+    <param name="use_tag_normal_heading" type="bool" value="$(arg use_tag_normal_heading)"/>
+    <param name="max_tag_inplane_yaw_correction_deg" value="$(arg max_tag_inplane_yaw_correction_deg)"/>
     <param name="apply_legacy_orientation_correction" type="bool"
            value="$(arg apply_legacy_orientation_correction)"/>
     <param name="enable_yolo_store_anchors" type="bool" value="$(arg enable_yolo_store_anchors)"/>

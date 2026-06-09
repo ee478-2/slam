@@ -346,6 +346,14 @@ filtered and yaw uses a circular mean over the latest
 rejection; if a large correction is real and stays consistent for the window, it
 is allowed to update the anchor.
 
+Planar anchor yaw ignores small AprilTag in-plane paper rotation by default.
+The localizer compares the tag-frame Euler-yaw anchor against the tag plane
+normal's horizontal heading and picks the normal-heading candidate closest to
+the Euler-yaw prior, limited by `max_tag_inplane_yaw_correction_deg:=60.0`.
+This corrects visibly twisted tags without allowing a 180-degree normal flip to
+turn the map around. `/global_localization/selected_tag` reports
+`heading_source` and `inplane_yaw_correction_deg` for live checks.
+
 YOLO store detections are not global anchors in the default launch, even though
 they share `/tag_detections`; only IDs configured as AprilTag signboard tags in
 `global_map.yaml` can move `global_map -> map`.
@@ -354,6 +362,7 @@ Tune the shortcut with:
 
 ```bash
 SLAM_APRILTAG_MIN_STABLE_FRAMES=5 SLAM_APRILTAG_SMOOTHING_WINDOW=7 slam global-loc
+SLAM_APRILTAG_MAX_INPLANE_CORRECTION_DEG=35 slam global-loc
 ```
 
 ---
