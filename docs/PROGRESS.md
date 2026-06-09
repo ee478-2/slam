@@ -36,6 +36,9 @@ this file stays an index + current open items.** Newest first.
 ## Log index
 
 ### 2026-06 — real-robot `slam` → [`docs/progress/2026-06.md`](progress/2026-06.md)
+- **2026-06-10** Filtered RTAB trajectory RViz — `c4266ae` · replaces raw
+  `/rtabmap/mapPath` RViz Path displays with jump/landmark-filtered marker
+  topics and makes odom comparison use `/rtabmap/odom` path fallback.
 - **2026-06-10** Localization jump guard — `23ff4a3` · holds same-source fused
   pose jumps and requires consecutive consistent source/frame corrections.
 - **2026-06-10** YOLO landmark trust reduction — `602f388` · raises YOLO
