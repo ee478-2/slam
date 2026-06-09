@@ -302,8 +302,9 @@ slam yolo-tags-remote
 ```
 
 `slam yolo-tags-remote` sets `ROS_MASTER_URI=http://192.168.0.200:11311`, infers
-`ROS_IP` from `ip route get 192.168.0.200`, uses `pose_best.onnx` by default,
-subscribes `/camera/color/image_raw` + `/camera/color/camera_info`, and publishes
+`ROS_IP` from `ip route get 192.168.0.200`, uses `pose_best.pt` by default
+(`pose_best.onnx` fallback if the `.pt` is missing), subscribes
+`/camera/color/image_raw` + `/camera/color/camera_info`, and publishes
 `/tag_detections`. Override with `SLAM_REMOTE_YOLO_POSE_MODEL`,
 `SLAM_REMOTE_YOLO_POSE_IMGSZ`, `SLAM_REMOTE_YOLO_POSE_HZ`,
 `SLAM_REMOTE_YOLO_POSE_IMAGE_TOPIC`,

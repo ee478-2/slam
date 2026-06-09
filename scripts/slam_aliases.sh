@@ -103,10 +103,18 @@ slam() {
            route_ip="$(ip route get "$SLAM_PI" 2>/dev/null | awk '{for (i=1;i<=NF;i++) if ($i=="src") {print $(i+1); exit}}')"
            export ROS_IP="${SLAM_REMOTE_ROS_IP:-${route_ip:-${ROS_IP:-$(hostname -I | awk '{print $1}')}}}"
            unset ROS_HOSTNAME
-           local model="${SLAM_REMOTE_YOLO_POSE_MODEL:-$SLAM_WS/src/slam/pose_best.onnx}"
+           local default_model="$SLAM_WS/src/slam/pose_best.pt"
+           if [ -z "${SLAM_REMOTE_YOLO_POSE_MODEL:-}" ] && [ ! -f "$default_model" ] && [ -f "$SLAM_WS/src/slam/pose_best.onnx" ]; then
+             default_model="$SLAM_WS/src/slam/pose_best.onnx"
+           fi
+           local model="${SLAM_REMOTE_YOLO_POSE_MODEL:-$default_model}"
            local image_topic="${SLAM_REMOTE_YOLO_POSE_IMAGE_TOPIC:-${SLAM_YOLO_POSE_IMAGE_TOPIC:-/camera/color/image_raw}}"
            local camera_info_topic="${SLAM_REMOTE_YOLO_POSE_CAMERA_INFO_TOPIC:-${SLAM_YOLO_POSE_CAMERA_INFO_TOPIC:-/camera/color/camera_info}}"
-           local imgsz="${SLAM_REMOTE_YOLO_POSE_IMGSZ:-512}"
+           local default_imgsz=640
+           case "$model" in
+             *.onnx) default_imgsz=512 ;;
+           esac
+           local imgsz="${SLAM_REMOTE_YOLO_POSE_IMGSZ:-$default_imgsz}"
            local hz="${SLAM_REMOTE_YOLO_POSE_HZ:-${SLAM_YOLO_POSE_HZ:-5.0}}"
            local output="${SLAM_REMOTE_YOLO_POSE_OUTPUT:-${SLAM_YOLO_POSE_OUTPUT:-/tag_detections}}"
            local debug_image="${SLAM_REMOTE_YOLO_POSE_DEBUG_IMAGE:-${SLAM_YOLO_POSE_DEBUG_IMAGE:-/yolo_pose_tag_detector/debug_image}}"
@@ -119,7 +127,7 @@ slam() {
            fi
            if [ ! -f "$model" ]; then
              echo "remote YOLO model missing: $model"
-             echo "copy pose_best.onnx to the laptop or set SLAM_REMOTE_YOLO_POSE_MODEL"
+             echo "copy pose_best.pt or pose_best.onnx to the laptop, or set SLAM_REMOTE_YOLO_POSE_MODEL"
              return 1
            fi
            setsid roslaunch slam yolo_pose_tag_detector.launch \
