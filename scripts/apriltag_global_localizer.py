@@ -23,7 +23,7 @@ import rospy
 import tf2_ros
 import yaml
 from apriltag_ros.msg import AprilTagDetectionArray
-from geometry_msgs.msg import PoseStamped, TransformStamped
+from geometry_msgs.msg import PoseStamped, PoseWithCovarianceStamped, TransformStamped
 from std_msgs.msg import String
 
 try:
@@ -271,6 +271,10 @@ class AprilTagGlobalLocalizer:
         self.tag_detections_topic = rospy.get_param(
             "~tag_detections_topic", "/tag_detections"
         )
+        self.initial_pose_topic = rospy.get_param("~initial_pose_topic", "/initialpose")
+        self.enable_initial_pose_anchor = get_bool_param(
+            "~enable_initial_pose_anchor", True
+        )
         self.publish_hz = float(rospy.get_param("~publish_hz", 20.0))
         self.lookup_timeout_s = float(rospy.get_param("~lookup_timeout_s", 0.02))
         self.max_tag_age_s = float(rospy.get_param("~max_tag_age_s", 0.5))
@@ -318,6 +322,7 @@ class AprilTagGlobalLocalizer:
         self._latest_detections = []
         self._detection_stability = {}
         self._anchor_windows = {}
+        self._pending_initial_pose = None
 
         self.transform_pub = rospy.Publisher(
             "/global_localization/transform", TransformStamped, queue_size=5
@@ -331,17 +336,27 @@ class AprilTagGlobalLocalizer:
 
         self.last_global_from_rtab = None
         self.last_selected = None
+        self.manual_global_from_rtab = None
+        self.manual_anchor_frame = None
         self._detection_warming_up = False
 
         rospy.Subscriber(
             self.tag_detections_topic, AprilTagDetectionArray, self.on_tag_detections,
             queue_size=10,
         )
+        if self.enable_initial_pose_anchor:
+            rospy.Subscriber(
+                self.initial_pose_topic,
+                PoseWithCovarianceStamped,
+                self.on_initial_pose,
+                queue_size=5,
+            )
 
         rospy.loginfo(
-            "[apriltag_global_localizer] loaded %d global landmarks / %d detection ids from %s; detections=%s; publishing %s -> %s planar=%s stable_frames=%d smoothing_window=%d",
+            "[apriltag_global_localizer] loaded %d global landmarks / %d detection ids from %s; detections=%s; initial_pose=%s enabled=%s; publishing %s -> %s planar=%s stable_frames=%d smoothing_window=%d",
             len(self.known_tags), len(self.tag_to_signboard), self.global_map_yaml,
-            self.tag_detections_topic, self.global_frame, self.rtabmap_frame,
+            self.tag_detections_topic, self.initial_pose_topic,
+            self.enable_initial_pose_anchor, self.global_frame, self.rtabmap_frame,
             self.constrain_to_planar, self.min_stable_frames,
             self.smoothing_window_size,
         )
@@ -500,6 +515,34 @@ class AprilTagGlobalLocalizer:
                     track["count"] = 0
                     self._anchor_windows.pop(signboard_id, None)
 
+    def on_initial_pose(self, msg):
+        ps = PoseStamped()
+        ps.header = msg.header
+        ps.header.frame_id = ps.header.frame_id or self.global_frame
+        ps.pose = msg.pose.pose
+        with self._lock:
+            self._pending_initial_pose = ps
+
+        if ps.header.frame_id != self.global_frame:
+            rospy.logwarn(
+                "[apriltag_global_localizer] initial pose frame is %s but global_frame is %s; using coordinates as-is",
+                ps.header.frame_id,
+                self.global_frame,
+            )
+        rospy.loginfo(
+            "[apriltag_global_localizer] initial pose received on %s: frame=%s x=%.3f y=%.3f yaw=%.2f",
+            self.initial_pose_topic,
+            ps.header.frame_id,
+            ps.pose.position.x,
+            ps.pose.position.y,
+            yaw_from_quat((
+                ps.pose.orientation.x,
+                ps.pose.orientation.y,
+                ps.pose.orientation.z,
+                ps.pose.orientation.w,
+            )),
+        )
+
     def lookup_transform(self, target_frame, source_frame, timeout_s=None):
         timeout = rospy.Duration(self.lookup_timeout_s if timeout_s is None else timeout_s)
         msg = self.tf_buffer.lookup_transform(
@@ -648,6 +691,59 @@ class AprilTagGlobalLocalizer:
             return None
         return self.choose_tf_anchor(now)
 
+    def choose_initial_pose_anchor(self):
+        with self._lock:
+            pending = self._pending_initial_pose
+            manual_anchor = self.manual_global_from_rtab
+
+        if pending is None:
+            return manual_anchor, False
+
+        try:
+            _msg, rtab_from_base = self.lookup_transform(
+                self.rtabmap_frame, self.base_frame
+            )
+        except Exception as e:
+            rospy.logwarn_throttle(
+                2.0,
+                "[apriltag_global_localizer] initial pose received, waiting for %s -> %s TF: %s",
+                self.rtabmap_frame,
+                self.base_frame,
+                e,
+            )
+            return manual_anchor, False
+
+        global_from_base = transform_from_pose(pending.pose)
+        global_from_rtab = anchor_transform(
+            global_from_base, rtab_from_base, self.constrain_to_planar
+        )
+
+        consumed = False
+        with self._lock:
+            if self._pending_initial_pose is pending:
+                self.manual_global_from_rtab = global_from_rtab
+                self.manual_anchor_frame = pending.header.frame_id
+                self._pending_initial_pose = None
+                manual_anchor = global_from_rtab
+                consumed = True
+
+        if consumed:
+            rospy.loginfo(
+                "[apriltag_global_localizer] anchored %s -> %s from initial pose frame=%s x=%.3f y=%.3f yaw=%.2f",
+                self.global_frame,
+                self.rtabmap_frame,
+                pending.header.frame_id,
+                pending.pose.position.x,
+                pending.pose.position.y,
+                yaw_from_quat((
+                    pending.pose.orientation.x,
+                    pending.pose.orientation.y,
+                    pending.pose.orientation.z,
+                    pending.pose.orientation.w,
+                )),
+            )
+        return manual_anchor, consumed
+
     def publish_robot_pose(self, global_from_rtab, stamp):
         try:
             _msg, rtab_from_base = self.lookup_transform(
@@ -670,6 +766,7 @@ class AprilTagGlobalLocalizer:
         rate = rospy.Rate(self.publish_hz)
         while not rospy.is_shutdown():
             now = rospy.Time.now()
+            initial_pose_anchor, initial_pose_is_new = self.choose_initial_pose_anchor()
             selected = self.choose_visible_anchor(now)
             if selected is not None:
                 (
@@ -714,6 +811,33 @@ class AprilTagGlobalLocalizer:
                     self.min_stable_frames,
                     smoothing_samples if smoothing_samples is not None else "tf",
                     self.smoothing_window_size, dist, anchor_error_m,
+                )
+            elif (
+                initial_pose_anchor is not None
+                and (
+                    initial_pose_is_new
+                    or self.last_global_from_rtab is None
+                    or self.last_selected == "initial_pose"
+                )
+            ):
+                self.last_global_from_rtab = initial_pose_anchor
+                self.last_selected = "initial_pose"
+                self.publish_anchor(initial_pose_anchor, now)
+                self.selected_tag_pub.publish(String(json.dumps({
+                    "anchor_error_m": 0.0,
+                    "tag": "initial_pose",
+                    "distance_m": 0.0,
+                    "global_frame": self.global_frame,
+                    "method": "initial_pose",
+                    "rtabmap_frame": self.rtabmap_frame,
+                    "planar": self.constrain_to_planar,
+                    "pose_frame": self.manual_anchor_frame or self.global_frame,
+                }, sort_keys=True)))
+                rospy.loginfo_throttle(
+                    3.0,
+                    "[apriltag_global_localizer] anchoring %s -> %s from initial pose",
+                    self.global_frame,
+                    self.rtabmap_frame,
                 )
             elif self.hold_last_transform and self.last_global_from_rtab is not None:
                 self.publish_anchor(self.last_global_from_rtab, now)
