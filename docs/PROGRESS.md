@@ -29,6 +29,9 @@ this file stays an index + current open items.** Newest first.
 ## Log index
 
 ### 2026-06 — real-robot `slam` → [`docs/progress/2026-06.md`](progress/2026-06.md)
+- **2026-06-09** AprilTag observer-facing normal heading — `a327ee2` · derives
+  anchor yaw from the observed tag plane normal facing the camera/base, avoiding
+  180° front/back convention flips and reporting normal tilt diagnostics.
 - **2026-06-09** YOLO pose detection visualization — `99c209a` · adds
   `/yolo_pose_tag_detector/debug_image` overlay for keypoints, horizontal edges,
   confidence, method, and the 3-frame publication gate.
