@@ -16,6 +16,15 @@
   <arg name="tag_freshness_s"   default="1.0"/>
   <arg name="global_freshness_s" default="1.0"/>
   <arg name="publish_hz"        default="20.0"/>
+  <arg name="jump_guard_enabled" default="true"/>
+  <arg name="jump_guard_max_gap_s" default="1.0"/>
+  <arg name="jump_guard_xy_slack_m" default="0.60"/>
+  <arg name="jump_guard_yaw_slack_deg" default="60.0"/>
+  <arg name="jump_guard_max_speed_mps" default="1.0"/>
+  <arg name="jump_guard_max_yaw_rate_deg_s" default="180.0"/>
+  <arg name="jump_guard_source_confirm_frames" default="2"/>
+  <arg name="jump_guard_source_consistency_m" default="0.25"/>
+  <arg name="jump_guard_source_consistency_yaw_deg" default="20.0"/>
 
   <node pkg="slam" type="localization_manager_node.py"
         name="localization_manager" output="screen">
@@ -25,5 +34,14 @@
     <param name="tag_freshness_s"  value="$(arg tag_freshness_s)"/>
     <param name="global_freshness_s" value="$(arg global_freshness_s)"/>
     <param name="publish_hz"       value="$(arg publish_hz)"/>
+    <param name="jump_guard_enabled" type="bool" value="$(arg jump_guard_enabled)"/>
+    <param name="jump_guard_max_gap_s" value="$(arg jump_guard_max_gap_s)"/>
+    <param name="jump_guard_xy_slack_m" value="$(arg jump_guard_xy_slack_m)"/>
+    <param name="jump_guard_yaw_slack_deg" value="$(arg jump_guard_yaw_slack_deg)"/>
+    <param name="jump_guard_max_speed_mps" value="$(arg jump_guard_max_speed_mps)"/>
+    <param name="jump_guard_max_yaw_rate_deg_s" value="$(arg jump_guard_max_yaw_rate_deg_s)"/>
+    <param name="jump_guard_source_confirm_frames" value="$(arg jump_guard_source_confirm_frames)"/>
+    <param name="jump_guard_source_consistency_m" value="$(arg jump_guard_source_consistency_m)"/>
+    <param name="jump_guard_source_consistency_yaw_deg" value="$(arg jump_guard_source_consistency_yaw_deg)"/>
   </node>
 </launch>

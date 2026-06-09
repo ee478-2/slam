@@ -168,8 +168,27 @@ slam() {
              echo "apriltag global localization (global_map->map, stable frames=$stable_frames, smoothing window=$smoothing_window, normal heading=$normal_heading, max in-plane correction=${max_inplane_correction}deg, single landmark yaw=$single_landmark_yaw) -> /tmp/global_loc.log" ;;
 
     loc)   # localization_manager: fuses tag/rtabmap pose -> /robot_pose + /odom
-           setsid roslaunch slam localization_manager.launch >/tmp/locman.log 2>&1 & \
-             echo "localization_manager (/odom + /robot_pose) -> /tmp/locman.log" ;;
+           local jump_guard="${SLAM_LOC_JUMP_GUARD:-true}"
+           local jump_gap="${SLAM_LOC_JUMP_GUARD_MAX_GAP_S:-1.0}"
+           local xy_slack="${SLAM_LOC_JUMP_GUARD_XY_SLACK_M:-0.60}"
+           local yaw_slack="${SLAM_LOC_JUMP_GUARD_YAW_SLACK_DEG:-60.0}"
+           local max_speed="${SLAM_LOC_JUMP_GUARD_MAX_SPEED_MPS:-1.0}"
+           local max_yaw_rate="${SLAM_LOC_JUMP_GUARD_MAX_YAW_RATE_DEG_S:-180.0}"
+           local confirm_frames="${SLAM_LOC_JUMP_GUARD_CONFIRM_FRAMES:-2}"
+           local consistency_m="${SLAM_LOC_JUMP_GUARD_CONSISTENCY_M:-0.25}"
+           local consistency_yaw="${SLAM_LOC_JUMP_GUARD_CONSISTENCY_YAW_DEG:-20.0}"
+           setsid roslaunch slam localization_manager.launch \
+             jump_guard_enabled:="$jump_guard" \
+             jump_guard_max_gap_s:="$jump_gap" \
+             jump_guard_xy_slack_m:="$xy_slack" \
+             jump_guard_yaw_slack_deg:="$yaw_slack" \
+             jump_guard_max_speed_mps:="$max_speed" \
+             jump_guard_max_yaw_rate_deg_s:="$max_yaw_rate" \
+             jump_guard_source_confirm_frames:="$confirm_frames" \
+             jump_guard_source_consistency_m:="$consistency_m" \
+             jump_guard_source_consistency_yaw_deg:="$consistency_yaw" \
+             >/tmp/locman.log 2>&1 & \
+             echo "localization_manager (/odom + /robot_pose, jump guard=$jump_guard) -> /tmp/locman.log" ;;
 
     arm-home|arm_home)
            local pose="${SLAM_ARM_HOME_POSE:-0 0.8 -3. -0.5 0}"

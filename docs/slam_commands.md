@@ -403,12 +403,22 @@ YOLO store detections are not global anchors in the default launch, even though
 they share `/tag_detections`; only IDs configured as AprilTag signboard tags in
 `global_map.yaml` can move `global_map -> map`.
 
+The final `/robot_pose` + `/odom` publisher has a separate jump guard in
+`slam loc`. Same-source jumps are held when they exceed
+`0.60 m + 1.0 m/s * dt` or `60 deg + 180 deg/s * dt`. Source/frame changes
+such as RTAB local odom yielding to a fresh global AprilTag correction must be
+consistent for 2 consecutive publish cycles before the correction is accepted.
+If no pose input exists for more than 1.0 s, the next pose seeds the guard
+instead of being compared against stale history.
+
 Tune the shortcut with:
 
 ```bash
 SLAM_APRILTAG_MIN_STABLE_FRAMES=5 SLAM_APRILTAG_SMOOTHING_WINDOW=7 slam global-loc
 SLAM_APRILTAG_MAX_INPLANE_CORRECTION_DEG=35 slam global-loc
 SLAM_APRILTAG_SINGLE_LANDMARK_YAW_SOURCE=tag slam global-loc
+SLAM_LOC_JUMP_GUARD=false slam loc
+SLAM_LOC_JUMP_GUARD_XY_SLACK_M=0.8 SLAM_LOC_JUMP_GUARD_CONFIRM_FRAMES=3 slam loc
 ```
 
 ---

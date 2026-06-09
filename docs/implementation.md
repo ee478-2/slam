@@ -159,20 +159,28 @@ spawn of `nexus_4wd_mecanum`. No autonomy. Args: `gui`, `pose_x`,
 ### 4.2 `localization_manager`
 **Where:** `src/localization_manager/scripts/localization_manager_node.py`
 
-A single rospy node fuses three pose sources and publishes
-`geometry_msgs/PoseStamped` on `/robot_pose` (frame: `map`) at
-**20 Hz**. The `pose_source` ROS parameter chooses the policy:
+A single rospy node fuses pose sources and publishes
+`geometry_msgs/PoseStamped` on `/robot_pose` plus `nav_msgs/Odometry` on
+`/odom` at **20 Hz**. The `pose_source` ROS parameter chooses the policy:
 
-| value     | behavior                                                                    |
-|-----------|-----------------------------------------------------------------------------|
-| `auto`    | tag-pose if it's < `tag_freshness_s` (1.0 s) old → sim_gt → rtabmap         |
-| `sim_gt`  | only `/gazebo/model_states` (filtered by `robot_model_name`)                |
-| `tag`     | only `/apriltag_localization_pose`                                          |
-| `rtabmap` | only `/rtabmap/odom`                                                        |
+| value        | behavior                                                                    |
+|--------------|-----------------------------------------------------------------------------|
+| `auto`       | global_tag if fresh → tag if fresh → sim_gt → rtabmap                       |
+| `global_tag` | only `/global_localization/robot_pose`                                      |
+| `sim_gt`     | only `/gazebo/model_states` (filtered by `robot_model_name`)                |
+| `tag`        | only `/apriltag_localization_pose`                                          |
+| `rtabmap`    | only `/rtabmap/odom`                                                        |
 
 Subscribers store the latest message under a lock; the main loop picks
-according to `pose_source`, re-stamps the message with the current ROS
-time, and republishes. Source switches are logged once on change.
+according to `pose_source`, applies the final jump guard, re-stamps the message
+with the current ROS time, and republishes. Source switches are logged once on
+change.
+
+The jump guard holds same-source pose jumps that exceed a velocity-based
+x/y/yaw gate. Large source/frame corrections, such as RTAB local odom yielding
+to a global AprilTag anchor, are accepted only after consecutive consistent
+corrections. A stale gap resets the guard so the first pose after a long pause
+can seed a new baseline.
 
 **Why a single `/robot_pose` topic?** Every downstream component
 (`signboard_recognition`, `agent_interface`) reads pose from a single
