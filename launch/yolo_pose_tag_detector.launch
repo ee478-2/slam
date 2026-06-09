@@ -7,7 +7,7 @@
   detections through its existing tag_detections subscriber.
 -->
 <launch>
-  <arg name="model_path" default="$(find slam)/pose_best.pt"/>
+  <arg name="model_path" default="$(find slam)/pose_best.onnx"/>
   <arg name="image_topic" default="/camera/color/image_raw"/>
   <arg name="camera_info_topic" default="/camera/color/camera_info"/>
   <arg name="output_topic" default="/tag_detections"/>

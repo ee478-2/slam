@@ -33,10 +33,10 @@ except ImportError:
 def default_model_path():
     if rospkg is not None:
         try:
-            return os.path.join(rospkg.RosPack().get_path("slam"), "pose_best.pt")
+            return os.path.join(rospkg.RosPack().get_path("slam"), "pose_best.onnx")
         except Exception:
             pass
-    return os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "pose_best.pt"))
+    return os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "pose_best.onnx"))
 
 
 def resolve_model_path(path):

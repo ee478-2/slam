@@ -203,7 +203,7 @@ map alignment for that global anchor.
 
 ### 2d. YOLO pose square-tag landmarks for RTAB
 
-The YOLO pose model at `$(find slam)/pose_best.pt` can publish square-tag
+The YOLO pose model at `$(find slam)/pose_best.onnx` can publish square-tag
 detections in the same `apriltag_ros/AprilTagDetectionArray` format RTAB already
 subscribes to. The square is treated as exactly `0.15 m x 0.15 m`:
 
@@ -225,7 +225,8 @@ Defaults:
 - Debug overlay topic is `/yolo_pose_tag_detector/debug_image`; it draws
   keypoints, horizontal width edges, tag id, score, and the `3/3` publication
   gate state.
-- Default model path is `pose_best.pt` through the Ultralytics/PyTorch runtime.
+- Default model path is `pose_best.onnx` through Ultralytics ONNX Runtime
+  (`onnxruntime` must be installed in the active Python environment).
 - Tag IDs default to `1000 + yolo_class_id`, avoiding collisions with physical
   AprilTag IDs `1..28`.
 - `store1..store8` are softly mapped to the `stores:` entries in
@@ -260,7 +261,7 @@ default; those detections are soft RTAB landmarks plus debug metadata only.
 
 Useful overrides:
 ```bash
-SLAM_YOLO_POSE_MODEL=$HOME/catkin_ws/src/slam/pose_best.pt \
+SLAM_YOLO_POSE_MODEL=$HOME/catkin_ws/src/slam/pose_best.onnx \
 SLAM_YOLO_POSE_HZ=3.0 \
 SLAM_YOLO_POSE_MIN_STABLE_FRAMES=3 \
 SLAM_YOLO_POSE_EMA_ALPHA=0.35 \
