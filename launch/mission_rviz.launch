@@ -1,0 +1,33 @@
+<?xml version="1.0"?>
+<!-- Compatibility wrapper for launching the mission RViz view by name. -->
+<launch>
+  <arg name="global_map_yaml" default="$(find slam)/config/global_map.yaml"/>
+  <arg name="frame_id" default="global_map"/>
+  <arg name="marker_topic" default="/mission/markers"/>
+  <arg name="marker_hz" default="1.0"/>
+  <arg name="show_signboard_details" default="true"/>
+  <arg name="show_visit_targets" default="true"/>
+  <arg name="run_rtab_path_filter" default="true"/>
+  <arg name="rtab_path_topic" default="/rtabmap/mapPath"/>
+  <arg name="rtab_path_marker_topic" default="/mission/rtab_path_marker"/>
+  <arg name="rtab_path_max_step_m" default="0.80"/>
+  <arg name="rtab_path_max_abs_z" default="0.12"/>
+  <arg name="run_rviz" default="true"/>
+  <arg name="rviz_config" default="$(find slam)/rviz/mission.rviz"/>
+
+  <include file="$(find slam)/launch/mission_viz.launch">
+    <arg name="global_map_yaml" value="$(arg global_map_yaml)"/>
+    <arg name="frame_id" value="$(arg frame_id)"/>
+    <arg name="marker_topic" value="$(arg marker_topic)"/>
+    <arg name="marker_hz" value="$(arg marker_hz)"/>
+    <arg name="show_signboard_details" value="$(arg show_signboard_details)"/>
+    <arg name="show_visit_targets" value="$(arg show_visit_targets)"/>
+    <arg name="run_rtab_path_filter" value="$(arg run_rtab_path_filter)"/>
+    <arg name="rtab_path_topic" value="$(arg rtab_path_topic)"/>
+    <arg name="rtab_path_marker_topic" value="$(arg rtab_path_marker_topic)"/>
+    <arg name="rtab_path_max_step_m" value="$(arg rtab_path_max_step_m)"/>
+    <arg name="rtab_path_max_abs_z" value="$(arg rtab_path_max_abs_z)"/>
+    <arg name="run_rviz" value="$(arg run_rviz)"/>
+    <arg name="rviz_config" value="$(arg rviz_config)"/>
+  </include>
+</launch>
