@@ -15,8 +15,9 @@ this file stays an index + current open items.** Newest first.
   `global_map -> map` and global `/odom`; `4558bf3` ignores small in-plane
   AprilTag paper twist when solving anchor yaw; `f5cb7b7` holds established yaw
   for single-landmark corrections; `94dd9c9` requires an initial/previous yaw
-  reference before trusting a single tag. Needs live robot validation against
-  real tag observations.
+  reference before trusting a single tag; `23ff4a3` adds final fused-pose jump
+  guarding before `/robot_pose` and `/odom`. Needs live robot validation
+  against real tag observations.
 - **YOLO pose RTAB landmark validation** — `6208574` publishes 15 cm square-tag
   YOLO keypoints as RTAB-compatible landmarks; `ffd2087` adds soft
   `store1..store8` global-map status mapping; `f8d15ca` validates ONNX runtime
@@ -35,6 +36,8 @@ this file stays an index + current open items.** Newest first.
 ## Log index
 
 ### 2026-06 — real-robot `slam` → [`docs/progress/2026-06.md`](progress/2026-06.md)
+- **2026-06-10** Localization jump guard — `23ff4a3` · holds same-source fused
+  pose jumps and requires consecutive consistent source/frame corrections.
 - **2026-06-10** YOLO landmark trust reduction — `602f388` · raises YOLO
   confidence/keypoint thresholds, requires 5 stable frames, and increases
   published covariance while noting the RTAB global-variance caveat.
