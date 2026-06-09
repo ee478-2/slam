@@ -913,14 +913,18 @@ class AprilTagGlobalLocalizer:
             "anchor_yaw_deg": round(math.degrees(raw_yaw), 2),
             "raw_anchor_yaw_deg": round(math.degrees(raw_yaw), 2),
             "raw_yaw_delta_from_reference_deg": None,
+            "waiting_for_yaw_reference": False,
             "single_landmark_yaw_source": self.single_landmark_yaw_source,
         }
-        if (
-            not self.constrain_to_planar
-            or self.single_landmark_yaw_source != "hold"
-            or yaw_reference is None
-        ):
+        if not self.constrain_to_planar or self.single_landmark_yaw_source != "hold":
             return raw_anchor, raw_anchor, diag
+        if yaw_reference is None:
+            diag.update({
+                "anchor_yaw_source": "waiting_for_yaw_reference",
+                "anchor_yaw_deg": None,
+                "waiting_for_yaw_reference": True,
+            })
+            return None, raw_anchor, diag
 
         held_yaw = yaw_from_quat(yaw_reference.q)
         held_anchor = anchor_transform(
@@ -972,6 +976,45 @@ class AprilTagGlobalLocalizer:
                         yaw_reference_source,
                     )
                 )
+                if global_from_rtab is None:
+                    raw_anchor_error_m = planar_point_error(
+                        raw_global_from_rtab, global_from_tag, rtab_from_tag
+                    )
+                    self.selected_tag_pub.publish(String(json.dumps({
+                        "anchor_error_m": None,
+                        "tag": tag_name,
+                        "distance_m": round(dist, 4),
+                        "global_frame": self.global_frame,
+                        "method": "waiting_for_yaw_reference",
+                        "rtabmap_frame": self.rtabmap_frame,
+                        "planar": self.constrain_to_planar,
+                        "tag_ids": tag_ids,
+                        "stable_frames": stable_count,
+                        "min_stable_frames": self.min_stable_frames,
+                        "smoothing_window_samples": smoothing_samples,
+                        "smoothing_window_size": self.smoothing_window_size,
+                        "heading_source": heading_diag.get("heading_source"),
+                        "inplane_yaw_correction_deg": heading_diag.get(
+                            "inplane_yaw_correction_deg"
+                        ),
+                        "anchor_yaw_source": yaw_diag["anchor_yaw_source"],
+                        "single_landmark_yaw_source": yaw_diag[
+                            "single_landmark_yaw_source"
+                        ],
+                        "anchor_yaw_deg": None,
+                        "raw_anchor_yaw_deg": yaw_diag["raw_anchor_yaw_deg"],
+                        "raw_yaw_delta_from_reference_deg": None,
+                        "raw_anchor_error_m": round(raw_anchor_error_m, 4),
+                        "waiting_for_yaw_reference": True,
+                    }, sort_keys=True)))
+                    rospy.logwarn_throttle(
+                        3.0,
+                        "[apriltag_global_localizer] visible %s ids=%s is stable, but single_landmark_yaw_source=hold needs an initial pose or previous anchor before using one tag for global yaw; set single_landmark_yaw_source:=tag to allow raw tag yaw",
+                        tag_name,
+                        tag_ids,
+                    )
+                    rate.sleep()
+                    continue
                 anchor_error_m = planar_point_error(
                     global_from_rtab, global_from_tag, rtab_from_tag
                 )
@@ -1008,6 +1051,9 @@ class AprilTagGlobalLocalizer:
                         "raw_yaw_delta_from_reference_deg"
                     ],
                     "raw_anchor_error_m": round(raw_anchor_error_m, 4),
+                    "waiting_for_yaw_reference": yaw_diag[
+                        "waiting_for_yaw_reference"
+                    ],
                 }, sort_keys=True)))
                 rospy.loginfo_throttle(
                     3.0,
