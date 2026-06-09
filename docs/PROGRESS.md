@@ -29,6 +29,9 @@ this file stays an index + current open items.** Newest first.
 ## Log index
 
 ### 2026-06 — real-robot `slam` → [`docs/progress/2026-06.md`](progress/2026-06.md)
+- **2026-06-09** Initial-pose anchor launch args — `5d695f9` · restores
+  `initial_pose_topic` / `enable_initial_pose_anchor` compatibility for
+  `robot_master/mission.launch` without reintroducing the AprilTag normal-heading fix.
 - **2026-06-09** Revert AprilTag normal heading fix — `5695c12` · restores the
   pre-`a327ee2` global-anchor yaw path after the map still appeared inverted.
 - **2026-06-09** AprilTag observer-facing normal heading — `a327ee2` · derives
