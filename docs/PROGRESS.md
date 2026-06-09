@@ -32,6 +32,9 @@ this file stays an index + current open items.** Newest first.
 ## Log index
 
 ### 2026-06 — real-robot `slam` → [`docs/progress/2026-06.md`](progress/2026-06.md)
+- **2026-06-09** Remote operation guide — `833d835` · adds
+  `docs/remote.md` for laptop ROS networking, remote YOLO, process checks, and
+  troubleshooting.
 - **2026-06-09** YOLO remote PyTorch default — `a512ef2` · defaults laptop
   offload to `pose_best.pt`, with ONNX fallback and conditional remote `imgsz`.
 - **2026-06-09** YOLO remote pose input size — `2a46034` · adds
