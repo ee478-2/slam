@@ -16,6 +16,12 @@
   <arg name="publish_debug_image" default="true"/>
   <arg name="global_map_yaml" default="$(find slam)/config/global_map.yaml"/>
   <arg name="publish_global_store_status" default="true"/>
+  <arg name="run_pickup_estimator" default="true"/>
+  <arg name="pickup_pose_topic" default="/pickup_point/relative_pose"/>
+  <arg name="pickup_status_topic" default="/pickup_point/status"/>
+  <arg name="pickup_tag_id" default="1000"/>
+  <arg name="pickup_target_frame" default="base_link"/>
+  <arg name="pickup_max_age_s" default="0.5"/>
 
   <arg name="tag_size_m" default="0.15"/>
   <arg name="base_tag_id" default="1000"/>
@@ -76,4 +82,14 @@
     <param name="fallback_depth_linear_variance" value="$(arg fallback_depth_linear_variance)"/>
     <param name="angular_variance" value="$(arg angular_variance)"/>
   </node>
+
+  <include if="$(arg run_pickup_estimator)"
+           file="$(find slam)/launch/pickup_point_estimator.launch">
+    <arg name="detections_topic" value="$(arg output_topic)"/>
+    <arg name="pose_topic" value="$(arg pickup_pose_topic)"/>
+    <arg name="status_topic" value="$(arg pickup_status_topic)"/>
+    <arg name="pickup_tag_id" value="$(arg pickup_tag_id)"/>
+    <arg name="target_frame" value="$(arg pickup_target_frame)"/>
+    <arg name="max_age_s" value="$(arg pickup_max_age_s)"/>
+  </include>
 </launch>

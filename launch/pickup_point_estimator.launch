@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<!-- Publish visible YOLO pickup target pose in base_link for visual servoing. -->
+<launch>
+  <arg name="detections_topic" default="/tag_detections"/>
+  <arg name="pose_topic" default="/pickup_point/relative_pose"/>
+  <arg name="status_topic" default="/pickup_point/status"/>
+  <arg name="pickup_tag_id" default="1000"/>
+  <arg name="target_frame" default="base_link"/>
+  <arg name="max_age_s" default="0.5"/>
+  <arg name="tf_timeout_s" default="0.1"/>
+  <arg name="status_hz" default="5.0"/>
+  <arg name="allow_latest_tf" default="true"/>
+  <arg name="restamp_output" default="true"/>
+
+  <node pkg="slam" type="pickup_point_estimator.py"
+        name="pickup_point_estimator" output="screen">
+    <param name="detections_topic" value="$(arg detections_topic)"/>
+    <param name="pose_topic" value="$(arg pose_topic)"/>
+    <param name="status_topic" value="$(arg status_topic)"/>
+    <param name="pickup_tag_id" value="$(arg pickup_tag_id)"/>
+    <param name="target_frame" value="$(arg target_frame)"/>
+    <param name="max_age_s" value="$(arg max_age_s)"/>
+    <param name="tf_timeout_s" value="$(arg tf_timeout_s)"/>
+    <param name="status_hz" value="$(arg status_hz)"/>
+    <param name="allow_latest_tf" value="$(arg allow_latest_tf)"/>
+    <param name="restamp_output" value="$(arg restamp_output)"/>
+  </node>
+</launch>

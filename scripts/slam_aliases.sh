@@ -94,7 +94,8 @@ slam() {
              echo "yolo pose square tags -> /tmp/yolo_pose_tags.log"
            echo "  model: $model"
            echo "  output: $output (RTAB consumes /tag_detections by default)"
-           echo "  debug image: $debug_image" ;;
+           echo "  debug image: $debug_image"
+           echo "  pickup relative pose: /pickup_point/relative_pose (status: /pickup_point/status)" ;;
 
     yolo-tags-remote|yolo_tags_remote|remote-yolo-tags|remote_yolo_tags)
            if [ ! -f "$SLAM_WS/devel/setup.bash" ]; then
@@ -150,7 +151,8 @@ slam() {
            echo "  camera info: $camera_info_topic"
            echo "  imgsz: $imgsz"
            echo "  output: $output (RTAB consumes /tag_detections)"
-           echo "  debug image: $debug_image" ;;
+           echo "  debug image: $debug_image"
+           echo "  pickup relative pose: /pickup_point/relative_pose (status: /pickup_point/status)" ;;
 
     global-loc|global_loc)
            local stable_frames="${SLAM_APRILTAG_MIN_STABLE_FRAMES:-3}"

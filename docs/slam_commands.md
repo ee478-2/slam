@@ -242,6 +242,12 @@ Defaults:
 - A detection must survive `SLAM_YOLO_POSE_MIN_STABLE_FRAMES=5` consecutive
   processed frames before publishing.
 - Published poses are EMA-smoothed with `SLAM_YOLO_POSE_EMA_ALPHA=0.35`.
+- The model class map is `pickup=0`, `store1..store8=1..8`. The pickup class
+  publishes as detection id `1000`, and this launch also starts
+  `pickup_point_estimator.py`. When pickup is visible, subscribe to
+  `/pickup_point/relative_pose` (`geometry_msgs/PoseStamped`, frame
+  `base_link`) for relative visual-servo input. `/pickup_point/status`
+  publishes JSON with `visible`, `x/y/z`, `yaw`, `distance`, and `age_s`.
 
 Vertical keypoint extent is intentionally weak. Even if all four keypoints solve
 PnP, the node biases x/z translation toward the horizontal pixel width
