@@ -14,8 +14,9 @@ this file stays an index + current open items.** Newest first.
 - **AprilTag global localization verification** — `a6783dd` wires
   `global_map -> map` and global `/odom`; `4558bf3` ignores small in-plane
   AprilTag paper twist when solving anchor yaw; `f5cb7b7` holds established yaw
-  for single-landmark corrections. Needs live robot validation against real tag
-  observations.
+  for single-landmark corrections; `94dd9c9` requires an initial/previous yaw
+  reference before trusting a single tag. Needs live robot validation against
+  real tag observations.
 - **YOLO pose RTAB landmark validation** — `6208574` publishes 15 cm square-tag
   YOLO keypoints as RTAB-compatible landmarks; `ffd2087` adds soft
   `store1..store8` global-map status mapping; `f8d15ca` validates ONNX runtime
@@ -33,6 +34,8 @@ this file stays an index + current open items.** Newest first.
 ## Log index
 
 ### 2026-06 — real-robot `slam` → [`docs/progress/2026-06.md`](progress/2026-06.md)
+- **2026-06-09** AprilTag yaw reference requirement — `94dd9c9` · waits for
+  `/initialpose` or a previous anchor before one visible tag can set global yaw.
 - **2026-06-09** AprilTag single-landmark yaw hold — `f5cb7b7` · keeps
   established `global_map -> map` yaw when one visible tag corrects x/y, so
   tilted/twisted tag pose yaw cannot keep rotating the map.
