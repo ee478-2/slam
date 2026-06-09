@@ -15,17 +15,6 @@ metadata:
     z: up in ROS map frame
     yaw_deg: 0 deg faces +X and follows the right-hand rule
 
-walls:
-  - id: wall_01
-    pose: {x: -1.0, y: -0.9}
-    size: {x: 0.5, y: 1.5}
-  - id: wall_02
-    pose: {x: 1.0, y: -0.9}
-    size: {x: 0.5, y: 1.5}
-  - id: wall_03
-    pose: {x: 0.0, y: 1.75}
-    size: {x: 2.5, y: 0.5}
-
 stores:
   - {id: store_burger_A, category: burger, x: -1.25, y: -1.15, visit_offset: {x: -0.6, y: 0.00, yaw: 0.0}, visited: false}
   - {id: store_burger_B, category: burger, x: 1.25, y: -0.85, visit_offset: {x: 0.6, y: 0.00, yaw: 3.14}, visited: false}
