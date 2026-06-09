@@ -21,8 +21,9 @@ this file stays an index + current open items.** Newest first.
   YOLO keypoints as RTAB-compatible landmarks; `ffd2087` adds soft
   `store1..store8` global-map status mapping; `f8d15ca` validates ONNX runtime
   compatibility; `ef42316` made ONNX the default; `7c3e1a6` makes
-  `pose_best.engine` the TensorRT default. Needs live validation of TensorRT
-  runtime, class-to-tag ID mapping, and RTAB landmark registration.
+  `pose_best.engine` the TensorRT default; `602f388` raises confidence gates,
+  requires 5 stable frames, and softens YOLO covariance. Needs live validation
+  of TensorRT runtime, class-to-tag ID mapping, and RTAB landmark registration.
 - **Loop closure via tag re-observation** — not yet captured (drive back to a seen tag).
 - **Wheel odometry calibration / true encoders** — `/wheel/odom` now exists as
   command-integrated odom; chassis still publishes no encoder/tick feedback.
@@ -34,6 +35,9 @@ this file stays an index + current open items.** Newest first.
 ## Log index
 
 ### 2026-06 — real-robot `slam` → [`docs/progress/2026-06.md`](progress/2026-06.md)
+- **2026-06-10** YOLO landmark trust reduction — `602f388` · raises YOLO
+  confidence/keypoint thresholds, requires 5 stable frames, and increases
+  published covariance while noting the RTAB global-variance caveat.
 - **2026-06-09** AprilTag yaw reference requirement — `94dd9c9` · waits for
   `/initialpose` or a previous anchor before one visible tag can set global yaw.
 - **2026-06-09** AprilTag single-landmark yaw hold — `f5cb7b7` · keeps
