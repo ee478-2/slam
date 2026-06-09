@@ -264,7 +264,7 @@ class YoloPoseTagDetector:
         )
 
         from ultralytics import YOLO
-        self.model = YOLO(self.model_path)
+        self.model = YOLO(self.model_path, task="pose")
         self.class_names = getattr(self.model.model, "names", {}) or {}
 
         rospy.Subscriber(
@@ -380,6 +380,9 @@ class YoloPoseTagDetector:
         result = results[0]
         if result.keypoints is None or result.boxes is None:
             return [], []
+        result_names = getattr(result, "names", None) or {}
+        if result_names and not self.class_names:
+            self.class_names = result_names
 
         keypoints_xy = result.keypoints.xy.cpu().numpy()
         keypoints_conf = (
@@ -406,7 +409,8 @@ class YoloPoseTagDetector:
             cls_id = int(classes[idx])
             tag_id = self.class_id_to_tag_id.get(cls_id, self.base_tag_id + cls_id)
             score = float(box_conf[idx])
-            class_name = str(self.class_names.get(cls_id, cls_id))
+            class_names = result_names or self.class_names
+            class_name = str(class_names.get(cls_id, cls_id))
             conf = keypoints_conf[idx]
             overlay = {
                 "tag_id": int(tag_id),
