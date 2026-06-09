@@ -76,9 +76,9 @@ class LocalizationManager:
         self.base_frame_name   = rospy.get_param("~base_frame_name", "base_link")
         self.jump_guard_enabled = self._bool_param("~jump_guard_enabled", True)
         self.jump_guard_max_gap_s = float(rospy.get_param("~jump_guard_max_gap_s", 1.0))
-        self.jump_guard_xy_slack_m = float(rospy.get_param("~jump_guard_xy_slack_m", 0.60))
+        self.jump_guard_xy_slack_m = float(rospy.get_param("~jump_guard_xy_slack_m", 0.25))
         self.jump_guard_yaw_slack_deg = float(rospy.get_param("~jump_guard_yaw_slack_deg", 60.0))
-        self.jump_guard_max_speed_mps = float(rospy.get_param("~jump_guard_max_speed_mps", 1.0))
+        self.jump_guard_max_speed_mps = float(rospy.get_param("~jump_guard_max_speed_mps", 0.20))
         self.jump_guard_max_yaw_rate_deg_s = float(
             rospy.get_param("~jump_guard_max_yaw_rate_deg_s", 180.0)
         )

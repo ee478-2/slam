@@ -18,9 +18,9 @@
   <arg name="publish_hz"        default="20.0"/>
   <arg name="jump_guard_enabled" default="true"/>
   <arg name="jump_guard_max_gap_s" default="1.0"/>
-  <arg name="jump_guard_xy_slack_m" default="0.60"/>
+  <arg name="jump_guard_xy_slack_m" default="0.25"/>
   <arg name="jump_guard_yaw_slack_deg" default="60.0"/>
-  <arg name="jump_guard_max_speed_mps" default="1.0"/>
+  <arg name="jump_guard_max_speed_mps" default="0.20"/>
   <arg name="jump_guard_max_yaw_rate_deg_s" default="180.0"/>
   <arg name="jump_guard_source_confirm_frames" default="2"/>
   <arg name="jump_guard_source_consistency_m" default="0.25"/>

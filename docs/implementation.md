@@ -176,11 +176,11 @@ according to `pose_source`, applies the final jump guard, re-stamps the message
 with the current ROS time, and republishes. Source switches are logged once on
 change.
 
-The jump guard holds same-source pose jumps that exceed a velocity-based
-x/y/yaw gate. Large source/frame corrections, such as RTAB local odom yielding
-to a global AprilTag anchor, are accepted only after consecutive consistent
-corrections. A stale gap resets the guard so the first pose after a long pause
-can seed a new baseline.
+The jump guard holds same-source pose jumps that exceed the default
+`0.25 m + 0.20 m/s * dt` x/y gate or the yaw gate. Large source/frame
+corrections, such as RTAB local odom yielding to a global AprilTag anchor, are
+accepted only after consecutive consistent corrections. A stale gap resets the
+guard so the first pose after a long pause can seed a new baseline.
 
 **Why a single `/robot_pose` topic?** Every downstream component
 (`signboard_recognition`, `agent_interface`) reads pose from a single

@@ -170,9 +170,9 @@ slam() {
     loc)   # localization_manager: fuses tag/rtabmap pose -> /robot_pose + /odom
            local jump_guard="${SLAM_LOC_JUMP_GUARD:-true}"
            local jump_gap="${SLAM_LOC_JUMP_GUARD_MAX_GAP_S:-1.0}"
-           local xy_slack="${SLAM_LOC_JUMP_GUARD_XY_SLACK_M:-0.60}"
+           local xy_slack="${SLAM_LOC_JUMP_GUARD_XY_SLACK_M:-0.25}"
            local yaw_slack="${SLAM_LOC_JUMP_GUARD_YAW_SLACK_DEG:-60.0}"
-           local max_speed="${SLAM_LOC_JUMP_GUARD_MAX_SPEED_MPS:-1.0}"
+           local max_speed="${SLAM_LOC_JUMP_GUARD_MAX_SPEED_MPS:-0.20}"
            local max_yaw_rate="${SLAM_LOC_JUMP_GUARD_MAX_YAW_RATE_DEG_S:-180.0}"
            local confirm_frames="${SLAM_LOC_JUMP_GUARD_CONFIRM_FRAMES:-2}"
            local consistency_m="${SLAM_LOC_JUMP_GUARD_CONSISTENCY_M:-0.25}"
