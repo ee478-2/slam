@@ -43,6 +43,10 @@
   <arg name="odom_guess_min_rotation"    default="0"/>
   <arg name="tag_linear_variance"        default="0.005"/>
   <arg name="launch_realsense"           default="false"/>
+  <arg name="filtered_path"              default="true"/>
+  <arg name="filtered_path_marker_topic" default="/rtabmap/filtered_path_marker"/>
+  <arg name="filtered_path_max_step_m"   default="0.80"/>
+  <arg name="filtered_path_max_abs_z"    default="0.12"/>
 
   <!-- Robot/camera frames + the base_link->camera_link mount, matching
        manipulation_control/launch/object_detection_system.launch so SLAM, nav
@@ -109,4 +113,12 @@
     <arg name="rviz"              value="$(arg rviz)"/>
     <arg name="localization"      value="$(arg localization)"/>
   </include>
+
+  <node if="$(arg filtered_path)" pkg="slam" type="rtab_path_filter.py"
+        name="rtab_path_filter" output="screen">
+    <param name="path_topic" value="/rtabmap/mapPath"/>
+    <param name="marker_topic" value="$(arg filtered_path_marker_topic)"/>
+    <param name="max_step_m" value="$(arg filtered_path_max_step_m)"/>
+    <param name="max_abs_z" value="$(arg filtered_path_max_abs_z)"/>
+  </node>
 </launch>

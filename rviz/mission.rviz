@@ -111,16 +111,11 @@ Visualization Manager:
       Name: Mission status
     - Class: rviz/Group
       Displays:
-        - Alpha: 1
-          Buffer Length: 1
-          Class: rviz/Path
-          Color: 25; 255; 95
+        - Class: rviz/Marker
           Enabled: true
-          Line Style: Lines
+          Marker Topic: /mission/rtab_path_marker
           Name: RTAB-Map trajectory
           Queue Size: 10
-          Topic: /rtabmap/mapPath
-          Unreliable: false
           Value: true
         - Angle Tolerance: 0.10000000149011612
           Class: rviz/Odometry

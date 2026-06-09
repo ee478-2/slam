@@ -6,6 +6,11 @@
   <arg name="marker_hz" default="1.0"/>
   <arg name="show_signboard_details" default="true"/>
   <arg name="show_visit_targets" default="true"/>
+  <arg name="run_rtab_path_filter" default="true"/>
+  <arg name="rtab_path_topic" default="/rtabmap/mapPath"/>
+  <arg name="rtab_path_marker_topic" default="/mission/rtab_path_marker"/>
+  <arg name="rtab_path_max_step_m" default="0.80"/>
+  <arg name="rtab_path_max_abs_z" default="0.12"/>
   <arg name="run_rviz" default="true"/>
   <arg name="rviz_config" default="$(find slam)/rviz/mission.rviz"/>
 
@@ -16,6 +21,14 @@
     <param name="marker_hz" value="$(arg marker_hz)"/>
     <param name="show_signboard_details" value="$(arg show_signboard_details)"/>
     <param name="show_visit_targets" value="$(arg show_visit_targets)"/>
+  </node>
+
+  <node if="$(arg run_rtab_path_filter)" pkg="slam" type="rtab_path_filter.py"
+        name="mission_rtab_path_filter" output="screen">
+    <param name="path_topic" value="$(arg rtab_path_topic)"/>
+    <param name="marker_topic" value="$(arg rtab_path_marker_topic)"/>
+    <param name="max_step_m" value="$(arg rtab_path_max_step_m)"/>
+    <param name="max_abs_z" value="$(arg rtab_path_max_abs_z)"/>
   </node>
 
   <node if="$(arg run_rviz)" pkg="rviz" type="rviz" name="mission_rviz"

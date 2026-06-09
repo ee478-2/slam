@@ -7,7 +7,7 @@
   <arg name="run_rviz" default="true"/>
   <arg name="common_frame" default="odom_compare"/>
   <arg name="rtab_odom_topic" default="/rtabmap/odom"/>
-  <arg name="rtab_path_topic" default="/rtabmap/mapPath"/>
+  <arg name="rtab_path_topic" default=""/>
   <arg name="wheel_odom_topic" default="/wheel/odom"/>
   <arg name="max_poses" default="5000"/>
 

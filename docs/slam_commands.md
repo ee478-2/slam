@@ -519,10 +519,10 @@ ps -eo pid,comm | awk '$2=="rviz"{print "rviz pid="$1}'
 ```
 
 The odom comparison view runs `launch/rtab_wheel_viz.launch`, which republishes
-RTAB-Map's `/rtabmap/mapPath` plus `/rtabmap/odom` to `/odom_compare/rtab_*`
-and `/wheel/odom` to `/odom_compare/wheel_*` in a synthetic `odom_compare`
-frame. It assumes the RTAB and wheel odom origins are comparable, so start it
-with the stack for the cleanest drift check; it is not a TF fusion result.
+RTAB-Map's `/rtabmap/odom` to `/odom_compare/rtab_*` and `/wheel/odom` to
+`/odom_compare/wheel_*` in a synthetic `odom_compare` frame. It assumes the
+RTAB and wheel odom origins are comparable, so start it with the stack for the
+cleanest drift check; it is not a TF fusion result.
 RTAB-Map is drawn green; wheel odom is drawn red.
 
 ---
@@ -679,7 +679,8 @@ If `rs-enumerate-devices` reports "No device detected" while `lsusb` still shows
 - **VO-lost flag** = `odom.pose.covariance[0] >= 9998` (covariance is on
   `PoseWithCovariance`, i.e. `pose.covariance`, NOT `pose.pose.covariance`).
 - **`/rtabmap/mapPath` includes landmark vertices** (z≈tag height) among robot poses
-  (z≈0), so the RViz Path spikes up to landmarks — artifact, not a bug.
+  (z≈0), so raw RViz Path displays spike up to landmarks. Use the filtered
+  marker topics in this package's RViz configs instead.
 - **`pgrep -f`/`pkill -f` self-match** your own command line → false "UP" reads. Use
   `ps -eo pid,comm` (comm field has no args).
 - `rostopic hz` never prints an average against the cross-machine master — use a rospy

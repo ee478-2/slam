@@ -21,7 +21,7 @@ class OdomCompareViz:
         self.common_frame = rospy.get_param("~common_frame", "odom_compare")
         self.rtab_odom_topic = rospy.get_param("~rtab_odom_topic", "/rtabmap/odom")
         self.wheel_odom_topic = rospy.get_param("~wheel_odom_topic", "/wheel/odom")
-        self.rtab_path_topic = rospy.get_param("~rtab_path_topic", "/rtabmap/mapPath")
+        self.rtab_path_topic = rospy.get_param("~rtab_path_topic", "")
         self.max_poses = int(rospy.get_param("~max_poses", 5000))
 
         self._lock = threading.Lock()
