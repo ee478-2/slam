@@ -106,6 +106,7 @@ slam() {
            local model="${SLAM_REMOTE_YOLO_POSE_MODEL:-$SLAM_WS/src/slam/pose_best.onnx}"
            local image_topic="${SLAM_REMOTE_YOLO_POSE_IMAGE_TOPIC:-${SLAM_YOLO_POSE_IMAGE_TOPIC:-/camera/color/image_raw}}"
            local camera_info_topic="${SLAM_REMOTE_YOLO_POSE_CAMERA_INFO_TOPIC:-${SLAM_YOLO_POSE_CAMERA_INFO_TOPIC:-/camera/color/camera_info}}"
+           local imgsz="${SLAM_REMOTE_YOLO_POSE_IMGSZ:-512}"
            local hz="${SLAM_REMOTE_YOLO_POSE_HZ:-${SLAM_YOLO_POSE_HZ:-5.0}}"
            local output="${SLAM_REMOTE_YOLO_POSE_OUTPUT:-${SLAM_YOLO_POSE_OUTPUT:-/tag_detections}}"
            local debug_image="${SLAM_REMOTE_YOLO_POSE_DEBUG_IMAGE:-${SLAM_YOLO_POSE_DEBUG_IMAGE:-/yolo_pose_tag_detector/debug_image}}"
@@ -123,7 +124,7 @@ slam() {
            fi
            setsid roslaunch slam yolo_pose_tag_detector.launch \
              model_path:="$model" image_topic:="$image_topic" camera_info_topic:="$camera_info_topic" \
-             inference_hz:="$hz" output_topic:="$output" \
+             imgsz:="$imgsz" inference_hz:="$hz" output_topic:="$output" \
              debug_image_topic:="$debug_image" publish_debug_image:="$publish_debug_image" \
              min_stable_frames:="$stable_frames" ema_alpha:="$ema" \
              class_id_to_tag_id:="$class_map" >/tmp/yolo_pose_tags_remote.log 2>&1 & \
@@ -133,6 +134,7 @@ slam() {
            echo "  model: $model"
            echo "  image: $image_topic"
            echo "  camera info: $camera_info_topic"
+           echo "  imgsz: $imgsz"
            echo "  output: $output (RTAB consumes /tag_detections)"
            echo "  debug image: $debug_image" ;;
 

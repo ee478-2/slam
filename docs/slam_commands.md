@@ -305,7 +305,8 @@ slam yolo-tags-remote
 `ROS_IP` from `ip route get 192.168.0.200`, uses `pose_best.onnx` by default,
 subscribes `/camera/color/image_raw` + `/camera/color/camera_info`, and publishes
 `/tag_detections`. Override with `SLAM_REMOTE_YOLO_POSE_MODEL`,
-`SLAM_REMOTE_YOLO_POSE_HZ`, `SLAM_REMOTE_YOLO_POSE_IMAGE_TOPIC`,
+`SLAM_REMOTE_YOLO_POSE_IMGSZ`, `SLAM_REMOTE_YOLO_POSE_HZ`,
+`SLAM_REMOTE_YOLO_POSE_IMAGE_TOPIC`,
 `SLAM_REMOTE_YOLO_POSE_CAMERA_INFO_TOPIC`, or `SLAM_REMOTE_ROS_IP` if needed.
 
 Stop it with `slam down`, or only that node with:
