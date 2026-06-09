@@ -36,6 +36,10 @@ this file stays an index + current open items.** Newest first.
 ## Log index
 
 ### 2026-06 — real-robot `slam` → [`docs/progress/2026-06.md`](progress/2026-06.md)
+- **2026-06-10** Mission RViz DISPLAY fix — `0602073` · injects
+  `DISPLAY` for `/mission_rviz` so direct roslaunch does not Qt-abort.
+- **2026-06-10** Mission RViz launch alias — `18f7093` · adds
+  `mission_rviz.launch` as a pass-through wrapper for `mission_viz.launch`.
 - **2026-06-10** Filtered RTAB trajectory RViz — `c4266ae` · replaces raw
   `/rtabmap/mapPath` RViz Path displays with jump/landmark-filtered marker
   topics and makes odom comparison use `/rtabmap/odom` path fallback.
