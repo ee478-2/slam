@@ -285,6 +285,29 @@ To force the portable ONNX path instead:
 SLAM_YOLO_POSE_MODEL=$HOME/catkin_ws/src/slam/pose_best.onnx slam yolo-tags
 ```
 
+To offload storefront YOLO pose inference to a laptop, run camera/RTAB on the
+Jetson and run the detector from a ROS-configured laptop shell. This keeps the
+TensorRT/Ultralytics memory footprint off the Jetson while still publishing the
+same `/tag_detections` topic for RTAB-Map:
+```bash
+# Jetson:
+./net_init.sh          # or the route/NAT setup from §6b
+slam cam
+slam rtab
+
+# Laptop:
+sudo ip route add 192.168.0.0/24 via <jetson_hotspot_ip>
+source ~/catkin_ws/src/slam/scripts/slam_aliases.sh
+slam yolo-tags-remote
+```
+
+`slam yolo-tags-remote` sets `ROS_MASTER_URI=http://192.168.0.200:11311`, infers
+`ROS_IP` from `ip route get 192.168.0.200`, uses `pose_best.onnx` by default,
+subscribes `/camera/color/image_raw` + `/camera/color/camera_info`, and publishes
+`/tag_detections`. Override with `SLAM_REMOTE_YOLO_POSE_MODEL`,
+`SLAM_REMOTE_YOLO_POSE_HZ`, `SLAM_REMOTE_YOLO_POSE_IMAGE_TOPIC`,
+`SLAM_REMOTE_YOLO_POSE_CAMERA_INFO_TOPIC`, or `SLAM_REMOTE_ROS_IP` if needed.
+
 Stop it with `slam down`, or only that node with:
 ```bash
 pkill -INT -f 'roslaunch slam yolo_pose_tag_detector'

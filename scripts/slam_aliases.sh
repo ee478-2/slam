@@ -93,6 +93,49 @@ slam() {
            echo "  output: $output (RTAB consumes /tag_detections by default)"
            echo "  debug image: $debug_image" ;;
 
+    yolo-tags-remote|yolo_tags_remote|remote-yolo-tags|remote_yolo_tags)
+           if [ ! -f "$SLAM_WS/devel/setup.bash" ]; then
+             echo "missing workspace setup: $SLAM_WS/devel/setup.bash"; return 1
+           fi
+           source "$SLAM_WS/devel/setup.bash"
+           export ROS_MASTER_URI="http://$SLAM_PI:11311"
+           local route_ip
+           route_ip="$(ip route get "$SLAM_PI" 2>/dev/null | awk '{for (i=1;i<=NF;i++) if ($i=="src") {print $(i+1); exit}}')"
+           export ROS_IP="${SLAM_REMOTE_ROS_IP:-${route_ip:-${ROS_IP:-$(hostname -I | awk '{print $1}')}}}"
+           unset ROS_HOSTNAME
+           local model="${SLAM_REMOTE_YOLO_POSE_MODEL:-$SLAM_WS/src/slam/pose_best.onnx}"
+           local image_topic="${SLAM_REMOTE_YOLO_POSE_IMAGE_TOPIC:-${SLAM_YOLO_POSE_IMAGE_TOPIC:-/camera/color/image_raw}}"
+           local camera_info_topic="${SLAM_REMOTE_YOLO_POSE_CAMERA_INFO_TOPIC:-${SLAM_YOLO_POSE_CAMERA_INFO_TOPIC:-/camera/color/camera_info}}"
+           local hz="${SLAM_REMOTE_YOLO_POSE_HZ:-${SLAM_YOLO_POSE_HZ:-5.0}}"
+           local output="${SLAM_REMOTE_YOLO_POSE_OUTPUT:-${SLAM_YOLO_POSE_OUTPUT:-/tag_detections}}"
+           local debug_image="${SLAM_REMOTE_YOLO_POSE_DEBUG_IMAGE:-${SLAM_YOLO_POSE_DEBUG_IMAGE:-/yolo_pose_tag_detector/debug_image}}"
+           local publish_debug_image="${SLAM_REMOTE_YOLO_POSE_PUBLISH_DEBUG_IMAGE:-${SLAM_YOLO_POSE_PUBLISH_DEBUG_IMAGE:-true}}"
+           local stable_frames="${SLAM_REMOTE_YOLO_POSE_MIN_STABLE_FRAMES:-${SLAM_YOLO_POSE_MIN_STABLE_FRAMES:-3}}"
+           local ema="${SLAM_REMOTE_YOLO_POSE_EMA_ALPHA:-${SLAM_YOLO_POSE_EMA_ALPHA:-0.35}}"
+           local class_map="${SLAM_REMOTE_YOLO_POSE_CLASS_ID_TO_TAG_ID:-${SLAM_YOLO_POSE_CLASS_ID_TO_TAG_ID:-}}"
+           if [ -z "$ROS_IP" ]; then
+             echo "could not infer ROS_IP; set SLAM_REMOTE_ROS_IP=<laptop_ip>"; return 1
+           fi
+           if [ ! -f "$model" ]; then
+             echo "remote YOLO model missing: $model"
+             echo "copy pose_best.onnx to the laptop or set SLAM_REMOTE_YOLO_POSE_MODEL"
+             return 1
+           fi
+           setsid roslaunch slam yolo_pose_tag_detector.launch \
+             model_path:="$model" image_topic:="$image_topic" camera_info_topic:="$camera_info_topic" \
+             inference_hz:="$hz" output_topic:="$output" \
+             debug_image_topic:="$debug_image" publish_debug_image:="$publish_debug_image" \
+             min_stable_frames:="$stable_frames" ema_alpha:="$ema" \
+             class_id_to_tag_id:="$class_map" >/tmp/yolo_pose_tags_remote.log 2>&1 & \
+             echo "remote yolo pose square tags -> /tmp/yolo_pose_tags_remote.log"
+           echo "  MASTER=$ROS_MASTER_URI  IP=$ROS_IP"
+           echo "  route to Pi: $(ip route get "$SLAM_PI" 2>/dev/null || echo unavailable)"
+           echo "  model: $model"
+           echo "  image: $image_topic"
+           echo "  camera info: $camera_info_topic"
+           echo "  output: $output (RTAB consumes /tag_detections)"
+           echo "  debug image: $debug_image" ;;
+
     global-loc|global_loc)
            local stable_frames="${SLAM_APRILTAG_MIN_STABLE_FRAMES:-3}"
            local smoothing_window="${SLAM_APRILTAG_SMOOTHING_WINDOW:-5}"
@@ -256,6 +299,8 @@ slam <cmd>:
   rtab          rtabmap RGB-D SLAM
   tags          apriltag detection (+ rtabmap landmarks)
   yolo-tags     YOLO pose square tags as RTAB-compatible landmarks
+  yolo-tags-remote
+                laptop-side YOLO pose tags; subscribes camera, publishes /tag_detections
   global-loc    AprilTag anchor: publish global_map->map + global robot pose
   loc           localization_manager -> /robot_pose + /odom (global if anchored)
   yolo          YOLO object detection
