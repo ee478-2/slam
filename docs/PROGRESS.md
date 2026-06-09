@@ -29,6 +29,8 @@ this file stays an index + current open items.** Newest first.
 ## Log index
 
 ### 2026-06 — real-robot `slam` → [`docs/progress/2026-06.md`](progress/2026-06.md)
+- **2026-06-09** Revert AprilTag normal heading fix — `5695c12` · restores the
+  pre-`a327ee2` global-anchor yaw path after the map still appeared inverted.
 - **2026-06-09** AprilTag observer-facing normal heading — `a327ee2` · derives
   anchor yaw from the observed tag plane normal facing the camera/base, avoiding
   180° front/back convention flips and reporting normal tilt diagnostics.
