@@ -333,15 +333,21 @@ consumes that pose first, so `/odom` and `/robot_pose` are in `global_map` while
 the anchor is fresh; if no tag anchor is available, they fall back to RTAB's
 local odometry frame. `/global_localization/selected_tag` reports the match
 method, tag IDs, `stable_frames`, `min_stable_frames`,
-`smoothing_window_samples`, `smoothing_window_size`, and `anchor_error_m`.
+`smoothing_window_samples`, `smoothing_window_size`, `tag_normal_tilt_deg`, and
+`anchor_error_m`.
 
 Direct `/tag_detections` anchors are stabilized by default: a signboard must be
 seen for `min_stable_frames:=3` consecutive detection frames before it can move
 `global_map -> map`. While the count is warming up, the node holds the previous
 anchor instead of falling through to a one-frame TF anchor. After the count is
 stable, direct detection anchors use a short smoothing window: x/y/z are median
-filtered and yaw uses a circular mean over the latest
-`smoothing_window_size:=5` samples. This intentionally does not add hard jump
+filtered and heading uses a circular mean of the AprilTag plane normal's
+horizontal projection over the latest `smoothing_window_size:=5` samples. For
+live detections, the node first chooses the normal direction that faces the
+camera, so an apriltag_ros front/back frame convention flip cannot inject a
+180-degree yaw error into `global_map -> map`. Observations whose plane normal
+is tilted too far out of the horizontal plane are skipped by
+`max_tag_normal_tilt_deg:=45.0`. This intentionally does not add hard jump
 rejection; if a large correction is real and stays consistent for the window, it
 is allowed to update the anchor.
 
@@ -352,7 +358,10 @@ they share `/tag_detections`; only IDs configured as AprilTag signboard tags in
 Tune the shortcut with:
 
 ```bash
-SLAM_APRILTAG_MIN_STABLE_FRAMES=5 SLAM_APRILTAG_SMOOTHING_WINDOW=7 slam global-loc
+SLAM_APRILTAG_MIN_STABLE_FRAMES=5 \
+SLAM_APRILTAG_SMOOTHING_WINDOW=7 \
+SLAM_APRILTAG_MAX_NORMAL_TILT_DEG=60 \
+slam global-loc
 ```
 
 ---

@@ -21,6 +21,7 @@
   <arg name="lookup_timeout_s" default="0.02"/>
   <arg name="max_tag_age_s" default="0.5"/>
   <arg name="max_tag_distance_m" default="2.0"/>
+  <arg name="max_tag_normal_tilt_deg" default="45.0"/>
   <arg name="min_stable_frames" default="3"/>
   <arg name="smoothing_window_size" default="5"/>
   <arg name="stable_max_frame_gap_s" default="0.35"/>
@@ -46,6 +47,7 @@
     <param name="lookup_timeout_s" value="$(arg lookup_timeout_s)"/>
     <param name="max_tag_age_s" value="$(arg max_tag_age_s)"/>
     <param name="max_tag_distance_m" value="$(arg max_tag_distance_m)"/>
+    <param name="max_tag_normal_tilt_deg" value="$(arg max_tag_normal_tilt_deg)"/>
     <param name="min_stable_frames" value="$(arg min_stable_frames)"/>
     <param name="smoothing_window_size" value="$(arg smoothing_window_size)"/>
     <param name="stable_max_frame_gap_s" value="$(arg stable_max_frame_gap_s)"/>
