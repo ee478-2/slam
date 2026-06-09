@@ -32,6 +32,8 @@ this file stays an index + current open items.** Newest first.
 ## Log index
 
 ### 2026-06 — real-robot `slam` → [`docs/progress/2026-06.md`](progress/2026-06.md)
+- **2026-06-09** YOLO pose live topic validation — runtime check confirms
+  camera input, detector status, debug image, and two published YOLO store tags.
 - **2026-06-09** YOLO TensorRT engine default — `7c3e1a6` · switches detector,
   launch, `slam yolo-tags`, and docs to use `pose_best.engine` by default, with
   ONNX/PT fallback if the engine is missing.
