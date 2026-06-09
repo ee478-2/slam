@@ -12,8 +12,9 @@ this file stays an index + current open items.** Newest first.
 - **`go_to_goal_avoid` tuning** — in-place yaw "wari-gari" oscillation on hardware; an
   oscillation fix was tried then reverted. Still being tuned.
 - **AprilTag global localization verification** — `a6783dd` wires
-  `global_map -> map` and global `/odom` when known signboard tags are visible;
-  needs live robot validation against real tag observations.
+  `global_map -> map` and global `/odom`; `4558bf3` ignores small in-plane
+  AprilTag paper twist when solving anchor yaw. Needs live robot validation
+  against real tag observations.
 - **YOLO pose RTAB landmark validation** — `6208574` publishes 15 cm square-tag
   YOLO keypoints as RTAB-compatible landmarks; `ffd2087` adds soft
   `store1..store8` global-map status mapping; `f8d15ca` validates ONNX runtime
@@ -30,6 +31,9 @@ this file stays an index + current open items.** Newest first.
 ## Log index
 
 ### 2026-06 — real-robot `slam` → [`docs/progress/2026-06.md`](progress/2026-06.md)
+- **2026-06-09** AprilTag in-plane heading twist — `4558bf3` · uses tag plane
+  normal heading, bounded by the Euler-yaw prior, to stop small rotated tags
+  from rotating `global_map -> map`.
 - **2026-06-09** YOLO ONNX default weights — `ef42316` · switches detector,
   launch, `slam yolo-tags`, and docs to use `pose_best.onnx` by default.
 - **2026-06-09** YOLO ONNX pose runtime validation — `f8d15ca` · validates
