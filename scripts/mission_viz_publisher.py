@@ -15,21 +15,22 @@ import os
 import rospy
 import yaml
 from geometry_msgs.msg import Point, PoseStamped
+from sensor_msgs.msg import Image
 from std_msgs.msg import String
 from visualization_msgs.msg import Marker, MarkerArray
+
+try:
+    import cv2
+    import numpy as np
+except ImportError:
+    cv2 = None
+    np = None
 
 try:
     import rospkg
 except ImportError:
     rospkg = None
 
-
-ITEM_CATEGORIES = {
-    "medicine": ["pharmacy"],
-    "hamburger": ["burger"],
-    "drink": ["cafe", "burger"],
-    "cup": ["cafe"],
-}
 
 STORE_INVENTORY = {
     "cafe": ["cup", "drink"],
@@ -113,6 +114,11 @@ class MissionVizPublisher:
             rospy.get_param("~show_signboard_details", True)
         )
         self.show_visit_targets = bool(rospy.get_param("~show_visit_targets", True))
+        self.status_image_topic = rospy.get_param(
+            "~status_image_topic", "/mission/status_image"
+        )
+        self.status_image_width = int(rospy.get_param("~status_image_width", 720))
+        self.status_image_height = int(rospy.get_param("~status_image_height", 300))
 
         self.map_data = self.load_global_map(self.global_map_yaml)
         self.frame_id = rospy.get_param(
@@ -120,10 +126,15 @@ class MissionVizPublisher:
             self.map_data.get("frame_id", "map"),
         )
         self.status_anchor = self.compute_status_anchor()
+        self.wall_top_z = self.compute_wall_top_z()
 
         self.robot_pose = None
         self.target_pose = None
         self.target_decision = {}
+        self.robot_state = "INIT"
+        self.initial_pose_received = None
+        self.current_target_type = ""
+        self.current_target_id = ""
         self.shopping_list = []
         self.visited_store_ids = set()
         self.grabbed_items = []
@@ -136,8 +147,28 @@ class MissionVizPublisher:
             queue_size=1,
             latch=True,
         )
+        self.status_image_pub = None
+        if cv2 is not None and np is not None:
+            self.status_image_pub = rospy.Publisher(
+                self.status_image_topic,
+                Image,
+                queue_size=1,
+                latch=True,
+            )
+        else:
+            rospy.logwarn(
+                "[mission_viz] cv2/numpy unavailable; %s will not be published",
+                self.status_image_topic,
+            )
 
         rospy.Subscriber("/robot_pose", PoseStamped, self.on_robot_pose, queue_size=5)
+        rospy.Subscriber("/robot_master/state", String, self.on_robot_state, queue_size=5)
+        rospy.Subscriber(
+            "/robot_master/state_detail",
+            String,
+            self.on_robot_state_detail,
+            queue_size=5,
+        )
         rospy.Subscriber("/shopping_list", String, self.on_shopping_list, queue_size=5)
         rospy.Subscriber("/visited_stores", String, self.on_visited_stores, queue_size=5)
         rospy.Subscriber("/grabbed_items", String, self.on_grabbed_items, queue_size=5)
@@ -155,11 +186,12 @@ class MissionVizPublisher:
         rospy.Timer(rospy.Duration.from_sec(period), self.on_timer)
 
         rospy.loginfo(
-            "[mission_viz] publishing %d walls, %d stores, %d signboards on %s",
+            "[mission_viz] publishing %d walls, %d stores, %d signboards on %s; status_image=%s",
             len(self.map_data["walls"]),
             len(self.map_data["stores"]),
             len(self.map_data["signboards"]),
             self.marker_topic,
+            self.status_image_topic if self.status_image_pub else "disabled",
         )
 
     def load_global_map(self, path):
@@ -250,6 +282,11 @@ class MissionVizPublisher:
             return (-2.8, 2.4, 1.1)
         return (min(xs) - 0.35, max(ys) + 0.35, 1.1)
 
+    def compute_wall_top_z(self):
+        if not self.map_data["walls"]:
+            return 0.18
+        return max(wall["z"] + 0.5 * wall["size_z"] for wall in self.map_data["walls"])
+
     def on_robot_pose(self, msg):
         self.robot_pose = {
             "x": float(msg.pose.position.x),
@@ -293,16 +330,40 @@ class MissionVizPublisher:
             "yaw": quat_to_yaw(msg.pose.orientation),
         }
 
+    def on_robot_state(self, msg):
+        state = str(msg.data).strip()
+        if state:
+            self.robot_state = state
+
+    def on_robot_state_detail(self, msg):
+        parsed = parse_jsonish(msg.data, default={})
+        if not isinstance(parsed, dict):
+            return
+        state = str(parsed.get("state", "")).strip()
+        if state:
+            self.robot_state = state
+        if "initial_pose_received" in parsed:
+            self.initial_pose_received = bool(parsed.get("initial_pose_received"))
+        target_type = parsed.get("target_type")
+        target_id = parsed.get("target_id")
+        self.current_target_type = "" if target_type in (None, "") else str(target_type)
+        self.current_target_id = "" if target_id in (None, "") else str(target_id)
+
     def on_target_json(self, msg):
         parsed = parse_jsonish(msg.data, default={})
         self.target_decision = parsed if isinstance(parsed, dict) else {}
         if self.target_decision and not self.target_decision.get("success", True):
             self.target_pose = None
+        target = self.target_decision.get("target") or {}
+        if isinstance(target, dict):
+            self.current_target_type = str(target.get("type", self.current_target_type))
+            self.current_target_id = str(target.get("id", self.current_target_id))
 
     def on_timer(self, _event):
         self.publish_markers()
 
     def publish_markers(self):
+        status_lines = self.status_lines()
         markers = []
         markers.extend(self.wall_markers())
         markers.extend(self.store_markers())
@@ -310,12 +371,14 @@ class MissionVizPublisher:
         markers.extend(self.visible_signboard_markers())
         markers.extend(self.robot_markers())
         markers.extend(self.target_markers())
-        markers.extend(self.status_markers())
+        markers.extend(self.status_markers(status_lines))
         self.marker_pub.publish(MarkerArray(markers=markers))
+        self.publish_status_image(status_lines)
 
     def wall_markers(self):
         markers = []
         for idx, wall in enumerate(self.map_data["walls"]):
+            markers.append(self.delete_marker("wall_labels", 9100 + idx))
             marker = self.base_marker("walls", 9000 + idx, Marker.CUBE)
             marker.pose.position.x = wall["x"]
             marker.pose.position.y = wall["y"]
@@ -326,26 +389,12 @@ class MissionVizPublisher:
             marker.scale.x = wall["size_x"]
             marker.scale.y = wall["size_y"]
             marker.scale.z = wall["size_z"]
-            self.set_color(marker, (0.95, 0.12, 0.08, 0.66))
+            self.set_color(marker, (1.0, 1.0, 1.0, 0.86))
             markers.append(marker)
-
-            markers.append(
-                self.text_marker(
-                    "wall_labels",
-                    9100 + idx,
-                    wall["x"],
-                    wall["y"],
-                    wall["z"] + 0.5 * wall["size_z"] + 0.12,
-                    wall["id"],
-                    0.095,
-                    (1.0, 0.45, 0.38, 1.0),
-                )
-            )
         return markers
 
     def store_markers(self):
         markers = []
-        needed_categories = self.needed_categories()
         for idx, store in enumerate(self.map_data["stores"]):
             visited = store["visited"] or store["id"] in self.visited_store_ids
             color = self.store_color(store["category"])
@@ -355,23 +404,12 @@ class MissionVizPublisher:
             marker = self.base_marker("storefronts", idx, Marker.CUBE)
             marker.pose.position.x = store["x"]
             marker.pose.position.y = store["y"]
-            marker.pose.position.z = 0.09
+            marker.pose.position.z = self.wall_top_z + 0.11
             marker.scale.x = 0.30
             marker.scale.y = 0.30
             marker.scale.z = 0.18
             self.set_color(marker, color)
             markers.append(marker)
-
-            if store["category"] in needed_categories and not visited:
-                need_marker = self.base_marker("needed_store_highlight", 200 + idx, Marker.CYLINDER)
-                need_marker.pose.position.x = store["x"]
-                need_marker.pose.position.y = store["y"]
-                need_marker.pose.position.z = 0.23
-                need_marker.scale.x = 0.42
-                need_marker.scale.y = 0.42
-                need_marker.scale.z = 0.025
-                self.set_color(need_marker, (1.0, 1.0, 1.0, 0.55))
-                markers.append(need_marker)
 
             if self.show_visit_targets:
                 markers.append(
@@ -381,7 +419,7 @@ class MissionVizPublisher:
                         store["visit_x"],
                         store["visit_y"],
                         store["visit_yaw"],
-                        0.17,
+                        self.wall_top_z + 0.14,
                         (1.0, 1.0, 1.0, 0.85),
                         scale=(0.26, 0.06, 0.06),
                     )
@@ -402,7 +440,7 @@ class MissionVizPublisher:
                     1000 + idx,
                     store["x"],
                     store["y"],
-                    0.52,
+                    self.wall_top_z + 0.45,
                     label,
                     0.105,
                     (1.0, 1.0, 1.0, 1.0),
@@ -413,6 +451,7 @@ class MissionVizPublisher:
     def signboard_markers(self):
         markers = []
         for idx, signboard in enumerate(self.map_data["signboards"]):
+            markers.append(self.delete_marker("signboard_labels", 3000 + idx))
             marker = self.base_marker("signboards", 2000 + idx, Marker.CUBE)
             marker.pose.position.x = signboard["x"]
             marker.pose.position.y = signboard["y"]
@@ -425,26 +464,6 @@ class MissionVizPublisher:
             marker.scale.z = 0.18
             self.set_color(marker, (1.0, 0.86, 0.16, 0.96))
             markers.append(marker)
-
-            label = signboard["id"]
-            if self.show_signboard_details:
-                tag_text = []
-                for tag in signboard["tags"]:
-                    tag_text.append("{}:{}:{}".format(tag["id"], tag["arrow"], tag["icon"]))
-                if tag_text:
-                    label += "\n" + "\n".join(tag_text)
-            markers.append(
-                self.text_marker(
-                    "signboard_labels",
-                    3000 + idx,
-                    signboard["x"],
-                    signboard["y"],
-                    signboard["z"] + 0.34,
-                    label,
-                    0.082,
-                    (1.0, 0.95, 0.35, 1.0),
-                )
-            )
         return markers
 
     def visible_signboard_markers(self):
@@ -468,24 +487,6 @@ class MissionVizPublisher:
             self.set_color(marker, (0.0, 0.95, 1.0, 0.86))
             markers.append(marker)
 
-            tag_id = obs.get("tag_id", obs.get("id", ""))
-            label = "visible tag {}\n{} {}".format(
-                tag_id,
-                obs.get("arrow", ""),
-                obs.get("icon", ""),
-            ).strip()
-            markers.append(
-                self.text_marker(
-                    "visible_signboard_labels",
-                    4500 + idx,
-                    x,
-                    y,
-                    0.94,
-                    label,
-                    0.105,
-                    (0.4, 1.0, 1.0, 1.0),
-                )
-            )
         return markers
 
     def robot_markers(self):
@@ -569,9 +570,16 @@ class MissionVizPublisher:
             markers.append(line)
         return markers
 
-    def status_markers(self):
-        x, y, z = self.status_anchor
+    def status_lines(self):
         status = ["MISSION STATUS"]
+        status.append("state: {}".format(self.robot_state or "unknown"))
+        if self.initial_pose_received is not None:
+            status.append(
+                "initial pose: {}".format(
+                    "received" if self.initial_pose_received else "waiting"
+                )
+            )
+        status.append("destination: {}".format(self.destination_text()))
         status.append(
             "needed: {}".format(", ".join(self.shopping_list) if self.shopping_list else "waiting")
         )
@@ -587,6 +595,10 @@ class MissionVizPublisher:
             status.append("inventory: {}".format(self.short_inventory_text()))
         if self.visible_observations:
             status.append("visible tags: {}".format(len(self.visible_observations)))
+        return status
+
+    def status_markers(self, status_lines):
+        x, y, z = self.status_anchor
         return [
             self.text_marker(
                 "mission_status",
@@ -594,17 +606,72 @@ class MissionVizPublisher:
                 x,
                 y,
                 z,
-                "\n".join(status),
-                0.115,
+                "\n".join(status_lines),
+                0.145,
                 (0.92, 0.95, 1.0, 1.0),
             )
         ]
 
-    def needed_categories(self):
-        categories = set()
-        for item in self.shopping_list:
-            categories.update(ITEM_CATEGORIES.get(item, []))
-        return categories
+    def publish_status_image(self, status_lines):
+        if self.status_image_pub is None:
+            return
+        width = max(360, int(self.status_image_width))
+        height = max(190, int(self.status_image_height))
+        image = np.full((height, width, 3), (24, 28, 34), dtype=np.uint8)
+        cv2.rectangle(image, (0, 0), (width - 1, 48), (44, 55, 68), -1)
+        cv2.rectangle(image, (0, 0), (width - 1, height - 1), (94, 112, 132), 2)
+
+        title = status_lines[0] if status_lines else "MISSION STATUS"
+        cv2.putText(
+            image,
+            title,
+            (18, 34),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.78,
+            (245, 248, 255),
+            2,
+            cv2.LINE_AA,
+        )
+
+        max_chars = max(30, int((width - 36) / 9.6))
+        y = 76
+        for line in status_lines[1:]:
+            if y > height - 18:
+                break
+            text = line if len(line) <= max_chars else line[: max_chars - 3] + "..."
+            cv2.putText(
+                image,
+                text,
+                (18, y),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.54,
+                (226, 234, 244),
+                1,
+                cv2.LINE_AA,
+            )
+            y += 28
+
+        msg = Image()
+        msg.header.stamp = rospy.Time.now()
+        msg.header.frame_id = self.frame_id
+        msg.height = height
+        msg.width = width
+        msg.encoding = "rgb8"
+        msg.is_bigendian = False
+        msg.step = width * 3
+        msg.data = image.tobytes()
+        self.status_image_pub.publish(msg)
+
+    def destination_text(self):
+        parts = [part for part in (self.current_target_type, self.current_target_id) if part]
+        if parts:
+            return " ".join(parts)
+        if self.target_pose:
+            return "target ({:.2f}, {:.2f})".format(
+                self.target_pose["x"],
+                self.target_pose["y"],
+            )
+        return "none"
 
     def short_inventory_text(self):
         if isinstance(self.inventory_value, dict):

@@ -6,6 +6,7 @@ Panels:
       Expanded:
         - /Global Options1
         - /Mission map + status1
+        - /Mission status1
         - /RTAB-Map1
         - /AprilTag recognition1
         - /Inventory / grasp1
@@ -72,7 +73,6 @@ Visualization Manager:
             agent_target: true
             agent_target_label: true
             mission_status: true
-            needed_store_highlight: true
             robot_pose: true
             robot_pose_label: true
             robot_to_target: true
@@ -93,6 +93,22 @@ Visualization Manager:
           Value: false
       Enabled: true
       Name: Mission map + status
+    - Class: rviz/Group
+      Displays:
+        - Class: rviz/Image
+          Enabled: true
+          Image Topic: /mission/status_image
+          Max Value: 1
+          Median window: 5
+          Min Value: 0
+          Name: Mission status panel
+          Normalize Range: true
+          Queue Size: 2
+          Transport Hint: raw
+          Unreliable: false
+          Value: true
+      Enabled: true
+      Name: Mission status
     - Class: rviz/Group
       Displays:
         - Alpha: 1
