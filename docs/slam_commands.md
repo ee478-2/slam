@@ -288,7 +288,9 @@ SLAM_YOLO_POSE_MODEL=$HOME/catkin_ws/src/slam/pose_best.onnx slam yolo-tags
 To offload storefront YOLO pose inference to a laptop, run camera/RTAB on the
 Jetson and run the detector from a ROS-configured laptop shell. This keeps the
 TensorRT/Ultralytics memory footprint off the Jetson while still publishing the
-same `/tag_detections` topic for RTAB-Map:
+same `/tag_detections` topic for RTAB-Map. Full remote setup, IP selection,
+process checks, shutdown, and troubleshooting are in
+[`docs/remote.md`](remote.md):
 ```bash
 # Jetson:
 ./net_init.sh          # or the route/NAT setup from §6b
@@ -500,6 +502,9 @@ RTAB-Map is drawn green; wheel odom is drawn red.
 ---
 
 ## 6b. RViz on YOUR OWN PC (ROS Noetic) — remote, native
+
+Full laptop/remote-network notes, including YOLO offload, are in
+[`docs/remote.md`](remote.md).
 
 Best remote option: run RViz locally on your machine, subscribing over the
 network. Renders on your GPU; **no custom package needed** — our config uses only
