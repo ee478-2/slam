@@ -12,6 +12,7 @@
   <arg name="rtab_path_max_step_m" default="0.80"/>
   <arg name="rtab_path_max_abs_z" default="0.12"/>
   <arg name="run_rviz" default="true"/>
+  <arg name="display" default="$(optenv DISPLAY :1)"/>
   <arg name="rviz_config" default="$(find slam)/rviz/mission.rviz"/>
 
   <node pkg="slam" type="mission_viz_publisher.py" name="mission_viz_publisher" output="screen">
@@ -32,5 +33,7 @@
   </node>
 
   <node if="$(arg run_rviz)" pkg="rviz" type="rviz" name="mission_rviz"
-        args="-d $(arg rviz_config)" output="screen"/>
+        args="-d $(arg rviz_config)" output="screen">
+    <env name="DISPLAY" value="$(arg display)"/>
+  </node>
 </launch>

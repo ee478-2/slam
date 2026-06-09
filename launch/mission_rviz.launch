@@ -13,6 +13,7 @@
   <arg name="rtab_path_max_step_m" default="0.80"/>
   <arg name="rtab_path_max_abs_z" default="0.12"/>
   <arg name="run_rviz" default="true"/>
+  <arg name="display" default="$(optenv DISPLAY :1)"/>
   <arg name="rviz_config" default="$(find slam)/rviz/mission.rviz"/>
 
   <include file="$(find slam)/launch/mission_viz.launch">
@@ -28,6 +29,7 @@
     <arg name="rtab_path_max_step_m" value="$(arg rtab_path_max_step_m)"/>
     <arg name="rtab_path_max_abs_z" value="$(arg rtab_path_max_abs_z)"/>
     <arg name="run_rviz" value="$(arg run_rviz)"/>
+    <arg name="display" value="$(arg display)"/>
     <arg name="rviz_config" value="$(arg rviz_config)"/>
   </include>
 </launch>
