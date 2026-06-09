@@ -29,6 +29,9 @@ this file stays an index + current open items.** Newest first.
 ## Log index
 
 ### 2026-06 — real-robot `slam` → [`docs/progress/2026-06.md`](progress/2026-06.md)
+- **2026-06-09** YOLO ONNX pose runtime validation — `f8d15ca` · validates
+  `pose_best.onnx` format/runtime compatibility and forces exported models to
+  load as pose in the detector.
 - **2026-06-09** Initial-pose anchor launch args — `5d695f9` · restores
   `initial_pose_topic` / `enable_initial_pose_anchor` compatibility for
   `robot_master/mission.launch` without reintroducing the AprilTag normal-heading fix.
