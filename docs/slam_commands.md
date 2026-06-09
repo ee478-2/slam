@@ -384,6 +384,15 @@ This corrects visibly twisted tags without allowing a 180-degree normal flip to
 turn the map around. `/global_localization/selected_tag` reports
 `heading_source` and `inplane_yaw_correction_deg` for live checks.
 
+After an initial pose or first tag anchor has established `global_map -> map`
+yaw, a single visible signboard no longer updates yaw by default. It still
+solves x/y so the observed signboard center lands on its configured global
+point, but `single_landmark_yaw_source:=hold` prevents a tilted or twisted tag
+from rotating the whole map. Set
+`SLAM_APRILTAG_SINGLE_LANDMARK_YAW_SOURCE=tag` to restore the older behavior.
+`/global_localization/selected_tag` reports `anchor_yaw_source`,
+`anchor_yaw_deg`, and `raw_anchor_yaw_deg`.
+
 YOLO store detections are not global anchors in the default launch, even though
 they share `/tag_detections`; only IDs configured as AprilTag signboard tags in
 `global_map.yaml` can move `global_map -> map`.
@@ -393,6 +402,7 @@ Tune the shortcut with:
 ```bash
 SLAM_APRILTAG_MIN_STABLE_FRAMES=5 SLAM_APRILTAG_SMOOTHING_WINDOW=7 slam global-loc
 SLAM_APRILTAG_MAX_INPLANE_CORRECTION_DEG=35 slam global-loc
+SLAM_APRILTAG_SINGLE_LANDMARK_YAW_SOURCE=tag slam global-loc
 ```
 
 ---

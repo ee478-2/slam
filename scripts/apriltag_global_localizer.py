@@ -198,10 +198,9 @@ def inverse_tf(tf):
     return Transform(ti, qi)
 
 
-def planar_anchor_transform(global_from_tag, rtab_from_tag, z=0.0):
+def planar_anchor_transform_with_yaw(global_from_tag, rtab_from_tag, yaw, z=0.0):
     # Solve the 2D alignment directly; projecting a 6-DoF tag solve can move
     # the tag's x/y point when roll, pitch, or camera height are present.
-    yaw = yaw_from_quat(global_from_tag.q) - yaw_from_quat(rtab_from_tag.q)
     c = math.cos(yaw)
     s = math.sin(yaw)
     rx, ry = rtab_from_tag.t[0], rtab_from_tag.t[1]
@@ -210,9 +209,18 @@ def planar_anchor_transform(global_from_tag, rtab_from_tag, z=0.0):
     return Transform((tx, ty, z), yaw_quat(yaw))
 
 
-def anchor_transform(global_from_tag, rtab_from_tag, planar=True):
+def planar_anchor_transform(global_from_tag, rtab_from_tag, z=0.0):
+    yaw = yaw_from_quat(global_from_tag.q) - yaw_from_quat(rtab_from_tag.q)
+    return planar_anchor_transform_with_yaw(global_from_tag, rtab_from_tag, yaw, z)
+
+
+def anchor_transform(global_from_tag, rtab_from_tag, planar=True, yaw_override=None):
     if planar:
-        return planar_anchor_transform(global_from_tag, rtab_from_tag)
+        if yaw_override is None:
+            return planar_anchor_transform(global_from_tag, rtab_from_tag)
+        return planar_anchor_transform_with_yaw(
+            global_from_tag, rtab_from_tag, yaw_override
+        )
     return compose(global_from_tag, inverse_tf(rtab_from_tag))
 
 
@@ -328,6 +336,15 @@ class AprilTagGlobalLocalizer:
         self.max_tag_inplane_yaw_correction_deg = float(
             rospy.get_param("~max_tag_inplane_yaw_correction_deg", 60.0)
         )
+        self.single_landmark_yaw_source = str(
+            rospy.get_param("~single_landmark_yaw_source", "hold")
+        ).strip().lower()
+        if self.single_landmark_yaw_source not in ("hold", "tag"):
+            rospy.logwarn(
+                "[apriltag_global_localizer] invalid single_landmark_yaw_source=%s; using hold",
+                self.single_landmark_yaw_source,
+            )
+            self.single_landmark_yaw_source = "hold"
         self.apply_legacy_orientation_correction = get_bool_param(
             "~apply_legacy_orientation_correction", True
         )
@@ -391,12 +408,13 @@ class AprilTagGlobalLocalizer:
             )
 
         rospy.loginfo(
-            "[apriltag_global_localizer] loaded %d global landmarks / %d detection ids from %s; detections=%s; initial_pose=%s enabled=%s; publishing %s -> %s planar=%s normal_heading=%s max_inplane_correction=%.1fdeg stable_frames=%d smoothing_window=%d",
+            "[apriltag_global_localizer] loaded %d global landmarks / %d detection ids from %s; detections=%s; initial_pose=%s enabled=%s; publishing %s -> %s planar=%s normal_heading=%s max_inplane_correction=%.1fdeg single_landmark_yaw=%s stable_frames=%d smoothing_window=%d",
             len(self.known_tags), len(self.tag_to_signboard), self.global_map_yaml,
             self.tag_detections_topic, self.initial_pose_topic,
             self.enable_initial_pose_anchor, self.global_frame, self.rtabmap_frame,
             self.constrain_to_planar, self.use_tag_normal_heading,
-            self.max_tag_inplane_yaw_correction_deg, self.min_stable_frames,
+            self.max_tag_inplane_yaw_correction_deg,
+            self.single_landmark_yaw_source, self.min_stable_frames,
             self.smoothing_window_size,
         )
 
@@ -879,6 +897,46 @@ class AprilTagGlobalLocalizer:
         self.transform_pub.publish(tf_msg)
         self.publish_robot_pose(global_from_rtab, stamp)
 
+    def solve_selected_anchor(
+        self,
+        global_from_tag,
+        rtab_from_tag,
+        yaw_reference=None,
+        yaw_reference_source="previous_anchor",
+    ):
+        raw_anchor = anchor_transform(
+            global_from_tag, rtab_from_tag, self.constrain_to_planar
+        )
+        raw_yaw = yaw_from_quat(raw_anchor.q)
+        diag = {
+            "anchor_yaw_source": "tag_landmark",
+            "anchor_yaw_deg": round(math.degrees(raw_yaw), 2),
+            "raw_anchor_yaw_deg": round(math.degrees(raw_yaw), 2),
+            "raw_yaw_delta_from_reference_deg": None,
+            "single_landmark_yaw_source": self.single_landmark_yaw_source,
+        }
+        if (
+            not self.constrain_to_planar
+            or self.single_landmark_yaw_source != "hold"
+            or yaw_reference is None
+        ):
+            return raw_anchor, raw_anchor, diag
+
+        held_yaw = yaw_from_quat(yaw_reference.q)
+        held_anchor = anchor_transform(
+            global_from_tag,
+            rtab_from_tag,
+            self.constrain_to_planar,
+            yaw_override=held_yaw,
+        )
+        yaw_delta = normalize_angle(raw_yaw - held_yaw)
+        diag.update({
+            "anchor_yaw_source": yaw_reference_source,
+            "anchor_yaw_deg": round(math.degrees(held_yaw), 2),
+            "raw_yaw_delta_from_reference_deg": round(math.degrees(yaw_delta), 2),
+        })
+        return held_anchor, raw_anchor, diag
+
     def spin(self):
         rate = rospy.Rate(self.publish_hz)
         while not rospy.is_shutdown():
@@ -897,11 +955,28 @@ class AprilTagGlobalLocalizer:
                     smoothing_samples,
                     heading_diag,
                 ) = selected
-                global_from_rtab = anchor_transform(
-                    global_from_tag, rtab_from_tag, self.constrain_to_planar
+                if initial_pose_is_new and initial_pose_anchor is not None:
+                    yaw_reference = initial_pose_anchor
+                    yaw_reference_source = "initial_pose"
+                else:
+                    yaw_reference = self.last_global_from_rtab
+                    yaw_reference_source = "previous_anchor"
+                    if yaw_reference is None and initial_pose_anchor is not None:
+                        yaw_reference = initial_pose_anchor
+                        yaw_reference_source = "initial_pose"
+                global_from_rtab, raw_global_from_rtab, yaw_diag = (
+                    self.solve_selected_anchor(
+                        global_from_tag,
+                        rtab_from_tag,
+                        yaw_reference,
+                        yaw_reference_source,
+                    )
                 )
                 anchor_error_m = planar_point_error(
                     global_from_rtab, global_from_tag, rtab_from_tag
+                )
+                raw_anchor_error_m = planar_point_error(
+                    raw_global_from_rtab, global_from_tag, rtab_from_tag
                 )
                 self.last_global_from_rtab = global_from_rtab
                 self.last_selected = tag_name
@@ -923,10 +998,20 @@ class AprilTagGlobalLocalizer:
                     "inplane_yaw_correction_deg": heading_diag.get(
                         "inplane_yaw_correction_deg"
                     ),
+                    "anchor_yaw_source": yaw_diag["anchor_yaw_source"],
+                    "single_landmark_yaw_source": yaw_diag[
+                        "single_landmark_yaw_source"
+                    ],
+                    "anchor_yaw_deg": yaw_diag["anchor_yaw_deg"],
+                    "raw_anchor_yaw_deg": yaw_diag["raw_anchor_yaw_deg"],
+                    "raw_yaw_delta_from_reference_deg": yaw_diag[
+                        "raw_yaw_delta_from_reference_deg"
+                    ],
+                    "raw_anchor_error_m": round(raw_anchor_error_m, 4),
                 }, sort_keys=True)))
                 rospy.loginfo_throttle(
                     3.0,
-                    "[apriltag_global_localizer] anchored %s -> %s using %s match=%s ids=%s stable=%s/%d smooth=%s/%d at %.2fm heading=%s correction=%.1fdeg planar_error=%.3fm",
+                    "[apriltag_global_localizer] anchored %s -> %s using %s match=%s ids=%s stable=%s/%d smooth=%s/%d at %.2fm heading=%s correction=%.1fdeg yaw=%s %.1fdeg raw=%.1fdeg delta=%s planar_error=%.3fm",
                     self.global_frame, self.rtabmap_frame, method, tag_name,
                     tag_ids,
                     stable_count if stable_count is not None else "tf",
@@ -935,6 +1020,16 @@ class AprilTagGlobalLocalizer:
                     self.smoothing_window_size, dist,
                     heading_diag.get("heading_source"),
                     heading_diag.get("inplane_yaw_correction_deg", 0.0),
+                    yaw_diag["anchor_yaw_source"],
+                    yaw_diag["anchor_yaw_deg"],
+                    yaw_diag["raw_anchor_yaw_deg"],
+                    (
+                        "none"
+                        if yaw_diag["raw_yaw_delta_from_reference_deg"] is None
+                        else "%.1fdeg" % yaw_diag[
+                            "raw_yaw_delta_from_reference_deg"
+                        ]
+                    ),
                     anchor_error_m,
                 )
             elif (
