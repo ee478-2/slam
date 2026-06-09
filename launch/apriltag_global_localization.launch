@@ -34,7 +34,7 @@
   <arg name="apply_legacy_orientation_correction" default="true"/>
   <!-- Keep YOLO store detections as soft RTAB landmarks by default. Enabling this
        makes YOLO store IDs 1001..1008 hard candidates for global_map->map. -->
-  <arg name="enable_yolo_store_anchors" default="false"/>
+  <arg name="enable_yolo_store_anchors" default="true"/>
   <arg name="yolo_store_tag_id_base" default="1000"/>
   <arg name="yolo_store_class_start" default="1"/>
   <arg name="yolo_store_default_z" default="0.365"/>

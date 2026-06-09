@@ -34,7 +34,7 @@ stores:
   - {id: store_phar_A, category: pharmacy, x: 1.00, y: 1.50, visit_offset: {x: 0.00, y: -0.6, yaw: 1.57}, visited: false}
   - {id: store_phar_B, category: pharmacy, x: 0.75, y: -1.20, visit_offset: {x: -0.6, y: 0.00, yaw: 0.00}, visited: false}
   - {id: store_store_A, category: convenience_store, x: -1.00, y: 1.50, visit_offset: {x: 0.00, y: -0.6, yaw: 1.57}, visited: false}
-  - {id: store_store_B, category: convenience_store, x: -1.00, y: -1.65, visit_offset: {x: 0.00, y: -0.6, yaw： 1.57}, visited: false}
+  - {id: store_store_B, category: convenience_store, x: -1.00, y: -1.65, visit_offset: {x: 0.00, y: -0.6, yaw: 1.57}, visited: false}
 
 pickup:
   frame_id: global_map
