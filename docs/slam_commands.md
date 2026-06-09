@@ -203,7 +203,7 @@ map alignment for that global anchor.
 
 ### 2d. YOLO pose square-tag landmarks for RTAB
 
-The YOLO pose model at `$(find slam)/pose_best.onnx` can publish square-tag
+The YOLO pose model at `$(find slam)/pose_best.engine` can publish square-tag
 detections in the same `apriltag_ros/AprilTagDetectionArray` format RTAB already
 subscribes to. The square is treated as exactly `0.15 m x 0.15 m`:
 
@@ -225,8 +225,9 @@ Defaults:
 - Debug overlay topic is `/yolo_pose_tag_detector/debug_image`; it draws
   keypoints, horizontal width edges, tag id, score, and the `3/3` publication
   gate state.
-- Default model path is `pose_best.onnx` through Ultralytics ONNX Runtime
-  (`onnxruntime` must be installed in the active Python environment).
+- Default model path is `pose_best.engine` through Ultralytics TensorRT. If the
+  engine is missing, the detector falls back to `pose_best.onnx` and then
+  `pose_best.pt` when matching files exist.
 - Tag IDs default to `1000 + yolo_class_id`, avoiding collisions with physical
   AprilTag IDs `1..28`.
 - `store1..store8` are softly mapped to the `stores:` entries in
@@ -261,15 +262,14 @@ default; those detections are soft RTAB landmarks plus debug metadata only.
 
 Useful overrides:
 ```bash
-SLAM_YOLO_POSE_MODEL=$HOME/catkin_ws/src/slam/pose_best.onnx \
 SLAM_YOLO_POSE_HZ=3.0 \
 SLAM_YOLO_POSE_MIN_STABLE_FRAMES=3 \
 SLAM_YOLO_POSE_EMA_ALPHA=0.35 \
 slam yolo-tags
 ```
 
-TensorRT remains optional. Build the engine on the Jetson, then override the
-model path explicitly:
+`training/storefront_yolo/export_yolo.py` generates the TensorRT engine. Build
+or refresh the engine on the Jetson deployment GPU:
 ```bash
 cd ~/catkin_ws/src/slam
 python3 training/storefront_yolo/export_yolo.py \
@@ -278,8 +278,11 @@ python3 training/storefront_yolo/export_yolo.py \
   --half \
   --imgsz 640 \
   --device 0
+```
 
-SLAM_YOLO_POSE_MODEL=$HOME/catkin_ws/src/slam/pose_best.engine slam yolo-tags
+To force the portable ONNX path instead:
+```bash
+SLAM_YOLO_POSE_MODEL=$HOME/catkin_ws/src/slam/pose_best.onnx slam yolo-tags
 ```
 
 Stop it with `slam down`, or only that node with:

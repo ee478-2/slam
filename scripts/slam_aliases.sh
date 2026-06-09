@@ -75,7 +75,7 @@ slam() {
              echo "apriltag -> /tmp/apriltag.log" ;;
 
     yolo-tags|yolo_tags|pose-tags|pose_tags)
-           local model="${SLAM_YOLO_POSE_MODEL:-$SLAM_WS/src/slam/pose_best.onnx}"
+           local model="${SLAM_YOLO_POSE_MODEL:-$SLAM_WS/src/slam/pose_best.engine}"
            local hz="${SLAM_YOLO_POSE_HZ:-5.0}"
            local output="${SLAM_YOLO_POSE_OUTPUT:-/tag_detections}"
            local debug_image="${SLAM_YOLO_POSE_DEBUG_IMAGE:-/yolo_pose_tag_detector/debug_image}"

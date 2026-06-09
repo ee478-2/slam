@@ -33,10 +33,10 @@ except ImportError:
 def default_model_path():
     if rospkg is not None:
         try:
-            return os.path.join(rospkg.RosPack().get_path("slam"), "pose_best.onnx")
+            return os.path.join(rospkg.RosPack().get_path("slam"), "pose_best.engine")
         except Exception:
             pass
-    return os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "pose_best.onnx"))
+    return os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "pose_best.engine"))
 
 
 def resolve_model_path(path):
@@ -45,8 +45,10 @@ def resolve_model_path(path):
         return path
     root, ext = os.path.splitext(path)
     if ext == ".engine":
-        fallback = root + ".pt"
-        if os.path.exists(fallback):
+        for fallback_ext in (".onnx", ".pt"):
+            fallback = root + fallback_ext
+            if not os.path.exists(fallback):
+                continue
             rospy.logwarn(
                 "[yolo_pose_tag_detector] optimized engine missing (%s); falling back to %s",
                 path, fallback,
