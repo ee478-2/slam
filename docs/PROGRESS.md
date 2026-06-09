@@ -18,8 +18,9 @@ this file stays an index + current open items.** Newest first.
 - **YOLO pose RTAB landmark validation** — `6208574` publishes 15 cm square-tag
   YOLO keypoints as RTAB-compatible landmarks; `ffd2087` adds soft
   `store1..store8` global-map status mapping; `f8d15ca` validates ONNX runtime
-  compatibility; `ef42316` makes `pose_best.onnx` the default. Needs live
-  validation of class-to-tag ID mapping and RTAB landmark registration.
+  compatibility; `ef42316` made ONNX the default; `7c3e1a6` makes
+  `pose_best.engine` the TensorRT default. Needs live validation of TensorRT
+  runtime, class-to-tag ID mapping, and RTAB landmark registration.
 - **Loop closure via tag re-observation** — not yet captured (drive back to a seen tag).
 - **Wheel odometry calibration / true encoders** — `/wheel/odom` now exists as
   command-integrated odom; chassis still publishes no encoder/tick feedback.
@@ -31,6 +32,9 @@ this file stays an index + current open items.** Newest first.
 ## Log index
 
 ### 2026-06 — real-robot `slam` → [`docs/progress/2026-06.md`](progress/2026-06.md)
+- **2026-06-09** YOLO TensorRT engine default — `7c3e1a6` · switches detector,
+  launch, `slam yolo-tags`, and docs to use `pose_best.engine` by default, with
+  ONNX/PT fallback if the engine is missing.
 - **2026-06-09** AprilTag in-plane heading twist — `4558bf3` · uses tag plane
   normal heading, bounded by the Euler-yaw prior, to stop small rotated tags
   from rotating `global_map -> map`.
