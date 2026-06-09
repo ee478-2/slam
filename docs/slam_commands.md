@@ -223,7 +223,7 @@ rqt_image_view /yolo_pose_tag_detector/debug_image
 Defaults:
 - Output topic is `/tag_detections`, so RTAB sees these as normal landmarks.
 - Debug overlay topic is `/yolo_pose_tag_detector/debug_image`; it draws
-  keypoints, horizontal width edges, tag id, score, and the `3/3` publication
+  keypoints, horizontal width edges, tag id, score, and the `5/5` publication
   gate state.
 - Default model path is `pose_best.engine` through Ultralytics TensorRT. If the
   engine is missing, the detector falls back to `pose_best.onnx` and then
@@ -238,23 +238,26 @@ Defaults:
   model has one class but multiple physical square tags, RTAB will collapse them
   into one landmark; train/use per-tag classes or set
   `SLAM_YOLO_POSE_CLASS_ID_TO_TAG_ID="0:1000,1:1001"` before `slam yolo-tags`.
-- A detection must survive `SLAM_YOLO_POSE_MIN_STABLE_FRAMES=3` consecutive
+- A detection must pass `min_box_conf:=0.50` and `min_keypoint_conf:=0.45`.
+- A detection must survive `SLAM_YOLO_POSE_MIN_STABLE_FRAMES=5` consecutive
   processed frames before publishing.
 - Published poses are EMA-smoothed with `SLAM_YOLO_POSE_EMA_ALPHA=0.35`.
 
 Vertical keypoint extent is intentionally weak. Even if all four keypoints solve
 PnP, the node biases x/z translation toward the horizontal pixel width
-(`pnp_horizontal_translation_weight=0.80`) and publishes larger covariance on the
-camera optical vertical axis than on the horizontal axis. This matches the
+(`pnp_horizontal_translation_weight=0.80`) and publishes deliberately large
+covariance on all axes, with the camera optical vertical axis still weakest.
+This matches the
 labeling rule: label the visible vertical part when occluded, but do not let
 RTAB treat that vertical extent as a precise metric. If only one or both
 horizontal edges are visible, the node falls back to width-only translation with
 even larger vertical covariance.
 
 RTAB-Map's AprilTag subscriber can also apply its global
-`tag_linear_variance` parameter depending on version/configuration. The pose
-itself is still horizontal-weighted, so the vertical-label caveat is not relying
-only on covariance propagation.
+`tag_linear_variance` parameter depending on version/configuration, so the
+per-detection covariance may not be the only weight RTAB uses. The primary
+false-positive defense is the higher confidence threshold plus consecutive
+frame gate; the larger published covariance is an extra softening layer.
 
 Global-frame anchoring remains AprilTag-first. `slam global-loc` deliberately
 does not use YOLO store IDs `1001..1008` to publish `global_map -> map` by
@@ -263,7 +266,9 @@ default; those detections are soft RTAB landmarks plus debug metadata only.
 Useful overrides:
 ```bash
 SLAM_YOLO_POSE_HZ=3.0 \
-SLAM_YOLO_POSE_MIN_STABLE_FRAMES=3 \
+SLAM_YOLO_POSE_MIN_BOX_CONF=0.50 \
+SLAM_YOLO_POSE_MIN_KEYPOINT_CONF=0.45 \
+SLAM_YOLO_POSE_MIN_STABLE_FRAMES=5 \
 SLAM_YOLO_POSE_EMA_ALPHA=0.35 \
 slam yolo-tags
 ```

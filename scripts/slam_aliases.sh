@@ -80,12 +80,15 @@ slam() {
            local output="${SLAM_YOLO_POSE_OUTPUT:-/tag_detections}"
            local debug_image="${SLAM_YOLO_POSE_DEBUG_IMAGE:-/yolo_pose_tag_detector/debug_image}"
            local publish_debug_image="${SLAM_YOLO_POSE_PUBLISH_DEBUG_IMAGE:-true}"
-           local stable_frames="${SLAM_YOLO_POSE_MIN_STABLE_FRAMES:-3}"
+           local min_box_conf="${SLAM_YOLO_POSE_MIN_BOX_CONF:-0.50}"
+           local min_keypoint_conf="${SLAM_YOLO_POSE_MIN_KEYPOINT_CONF:-0.45}"
+           local stable_frames="${SLAM_YOLO_POSE_MIN_STABLE_FRAMES:-5}"
            local ema="${SLAM_YOLO_POSE_EMA_ALPHA:-0.35}"
            local class_map="${SLAM_YOLO_POSE_CLASS_ID_TO_TAG_ID:-}"
            setsid roslaunch slam yolo_pose_tag_detector.launch \
              model_path:="$model" inference_hz:="$hz" output_topic:="$output" \
              debug_image_topic:="$debug_image" publish_debug_image:="$publish_debug_image" \
+             min_box_conf:="$min_box_conf" min_keypoint_conf:="$min_keypoint_conf" \
              min_stable_frames:="$stable_frames" ema_alpha:="$ema" \
              class_id_to_tag_id:="$class_map" >/tmp/yolo_pose_tags.log 2>&1 & \
              echo "yolo pose square tags -> /tmp/yolo_pose_tags.log"
@@ -119,7 +122,9 @@ slam() {
            local output="${SLAM_REMOTE_YOLO_POSE_OUTPUT:-${SLAM_YOLO_POSE_OUTPUT:-/tag_detections}}"
            local debug_image="${SLAM_REMOTE_YOLO_POSE_DEBUG_IMAGE:-${SLAM_YOLO_POSE_DEBUG_IMAGE:-/yolo_pose_tag_detector/debug_image}}"
            local publish_debug_image="${SLAM_REMOTE_YOLO_POSE_PUBLISH_DEBUG_IMAGE:-${SLAM_YOLO_POSE_PUBLISH_DEBUG_IMAGE:-true}}"
-           local stable_frames="${SLAM_REMOTE_YOLO_POSE_MIN_STABLE_FRAMES:-${SLAM_YOLO_POSE_MIN_STABLE_FRAMES:-3}}"
+           local min_box_conf="${SLAM_REMOTE_YOLO_POSE_MIN_BOX_CONF:-${SLAM_YOLO_POSE_MIN_BOX_CONF:-0.50}}"
+           local min_keypoint_conf="${SLAM_REMOTE_YOLO_POSE_MIN_KEYPOINT_CONF:-${SLAM_YOLO_POSE_MIN_KEYPOINT_CONF:-0.45}}"
+           local stable_frames="${SLAM_REMOTE_YOLO_POSE_MIN_STABLE_FRAMES:-${SLAM_YOLO_POSE_MIN_STABLE_FRAMES:-5}}"
            local ema="${SLAM_REMOTE_YOLO_POSE_EMA_ALPHA:-${SLAM_YOLO_POSE_EMA_ALPHA:-0.35}}"
            local class_map="${SLAM_REMOTE_YOLO_POSE_CLASS_ID_TO_TAG_ID:-${SLAM_YOLO_POSE_CLASS_ID_TO_TAG_ID:-}}"
            if [ -z "$ROS_IP" ]; then
@@ -134,6 +139,7 @@ slam() {
              model_path:="$model" image_topic:="$image_topic" camera_info_topic:="$camera_info_topic" \
              imgsz:="$imgsz" inference_hz:="$hz" output_topic:="$output" \
              debug_image_topic:="$debug_image" publish_debug_image:="$publish_debug_image" \
+             min_box_conf:="$min_box_conf" min_keypoint_conf:="$min_keypoint_conf" \
              min_stable_frames:="$stable_frames" ema_alpha:="$ema" \
              class_id_to_tag_id:="$class_map" >/tmp/yolo_pose_tags_remote.log 2>&1 & \
              echo "remote yolo pose square tags -> /tmp/yolo_pose_tags_remote.log"

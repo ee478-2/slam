@@ -215,13 +215,13 @@ class YoloPoseTagDetector:
         self.horizontal_pairs = parse_horizontal_pairs(
             rospy.get_param("~horizontal_pairs", "0,1;3,2")
         )
-        self.min_box_conf = float(rospy.get_param("~min_box_conf", 0.35))
-        self.min_keypoint_conf = float(rospy.get_param("~min_keypoint_conf", 0.30))
+        self.min_box_conf = float(rospy.get_param("~min_box_conf", 0.50))
+        self.min_keypoint_conf = float(rospy.get_param("~min_keypoint_conf", 0.45))
         self.inference_hz = float(rospy.get_param("~inference_hz", 5.0))
         self.imgsz = int(rospy.get_param("~imgsz", 640))
         self.device = rospy.get_param("~device", "")
         self.min_stable_frames = max(
-            1, int(rospy.get_param("~min_stable_frames", 3))
+            1, int(rospy.get_param("~min_stable_frames", 5))
         )
         self.ema_alpha = max(
             0.0, min(1.0, float(rospy.get_param("~ema_alpha", 0.35)))
@@ -237,14 +237,14 @@ class YoloPoseTagDetector:
             ),
         )
         self.pnp_linear_variance = (
-            float(rospy.get_param("~horizontal_linear_variance", 0.02)),
-            float(rospy.get_param("~vertical_linear_variance", 0.15)),
-            float(rospy.get_param("~depth_linear_variance", 0.05)),
+            float(rospy.get_param("~horizontal_linear_variance", 0.20)),
+            float(rospy.get_param("~vertical_linear_variance", 1.50)),
+            float(rospy.get_param("~depth_linear_variance", 0.50)),
         )
         self.fallback_linear_variance = (
-            float(rospy.get_param("~fallback_horizontal_linear_variance", 0.04)),
-            float(rospy.get_param("~fallback_vertical_linear_variance", 0.25)),
-            float(rospy.get_param("~fallback_depth_linear_variance", 0.08)),
+            float(rospy.get_param("~fallback_horizontal_linear_variance", 0.40)),
+            float(rospy.get_param("~fallback_vertical_linear_variance", 2.50)),
+            float(rospy.get_param("~fallback_depth_linear_variance", 0.80)),
         )
         self.angular_variance = float(rospy.get_param("~angular_variance", 9999.0))
 
