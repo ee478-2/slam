@@ -36,6 +36,8 @@ this file stays an index + current open items.** Newest first.
 ## Log index
 
 ### 2026-06 — real-robot `slam` → [`docs/progress/2026-06.md`](progress/2026-06.md)
+- **2026-06-10** YOLO pickup relative pose — `a1d5b66` · publishes visible
+  pickup `tag_id=1000` as `/pickup_point/relative_pose` in `base_link`.
 - **2026-06-10** Real-robot jump guard tuning — `b251638` · tightens
   same-source fused-pose x/y jumps to `0.25 m + 0.20 m/s * dt`.
 - **2026-06-10** Mission RViz DISPLAY fix — `0602073` · injects
