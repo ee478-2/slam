@@ -32,6 +32,14 @@ this file stays an index + current open items.** Newest first.
 ## Log index
 
 ### 2026-06 — real-robot `slam` → [`docs/progress/2026-06.md`](progress/2026-06.md)
+- **2026-06-09** YOLO remote PyTorch default — `a512ef2` · defaults laptop
+  offload to `pose_best.pt`, with ONNX fallback and conditional remote `imgsz`.
+- **2026-06-09** YOLO remote pose input size — `2a46034` · adds
+  `SLAM_REMOTE_YOLO_POSE_IMGSZ` so ONNX fallback/override can match fixed input
+  size.
+- **2026-06-09** YOLO remote pose launcher — `9d7c319` · adds
+  `slam yolo-tags-remote` for laptop-side inference against the Jetson ROS
+  master.
 - **2026-06-09** YOLO pose live topic validation — runtime check confirms
   camera input, detector status, debug image, and two published YOLO store tags.
 - **2026-06-09** YOLO TensorRT engine default — `7c3e1a6` · switches detector,
